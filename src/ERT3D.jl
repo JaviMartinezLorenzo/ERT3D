@@ -25,8 +25,11 @@ using WriteVTK
 using ProgressMeter
 
 # ---- Core abstractions ------------------------------------------------
-include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
+include("parameters.jl")
 include("grid.jl")             # Grid: 2π-periodic Cartesian grid, Δx, wavenumbers
+include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
+include("physics.jl")          # Primitive variables calculations
+
 
 # ---- Axis 1: spatial flux formulations --------------------------------
 include("schemes/abstract.jl")         # FluxScheme abstract type + compute_flux interface

@@ -47,8 +47,4 @@ docs/                         — design rationale
   convective derivative operators." *J. Comput. Phys.* 229 (2010): 7180-7190.
 - Brachet, M.E. et al. "Small-scale structure of the Taylor-Green vortex."
   *J. Fluid Mech.* 130 (1983): 411-452.
-- [TODO: add the 2008 reversibility-benchmark reference once confirmed]
-
-## License
-
-[TODO: MIT recommended]
+- Duponcheel, M., Orlandi, P., Winckelmans, G. "Time-reversibility of the Euler equations as a benchmark for energy conserving schemes." J. Comput. Phys. 227 (2008): 8736-8752.
