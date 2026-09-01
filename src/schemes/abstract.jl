@@ -1,21 +1,43 @@
 """
     FluxScheme
 
-Abstract type for spatial discretization of the convective (flux) terms.
-Every concrete subtype must implement:
+Abstract type for spatial formulations of the compressible Euler
+equations.
 
-    compute_flux(scheme::FluxScheme, state::State, grid::Grid) -> dstate/dt contribution
+Concrete subtypes define how the convective terms are formulated.
+The spatial derivative operator is supplied separately through a
+`DerivativeOperator`, allowing the flux formulation and derivative
+discretization to be varied independently.
 
-Concrete subtypes should each carry their own stencil order `L` as a field,
-so order-of-accuracy sweeps (L=1,2,3,...) don't require new types.
+Implemented formulations include:
 
-Adding a new formulation later (e.g. C-KG-SF, eq. 16) means:
-  1. define a new `struct ConservativeKG <: FluxScheme` with its fields
-  2. implement `compute_flux` for it
-  3. nothing else in the codebase needs to change
+- `Direct`      — direct discretization of the original Euler equations.
+- `Pirozzoli`   — split formulation following Pirozzoli.
+- `Feiereisen`  — formulation following Feiereisen et al.
+
+A concrete subtype must implement:
+
+    spatial_operator!(out, scheme, state, D, grid, params)
+
+where `out` contains the spatial contribution to the five conserved
+equations.
 """
 abstract type FluxScheme end
 
-# TODO: function compute_flux(scheme::FluxScheme, state, grid) end
-#       (defined generically here only as a documented interface;
-#        each scheme file provides its own method)
+
+"""
+    spatial_operator!
+
+Interface for the spatial discretization of the compressible Euler
+equations.
+
+The concrete method is selected by the type of `scheme`.
+"""
+function spatial_operator! end
+
+
+struct Direct <: FluxScheme end
+
+struct Pirozzoli <: FluxScheme end
+
+struct Feiereisen <: FluxScheme end

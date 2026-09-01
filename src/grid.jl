@@ -15,7 +15,7 @@ Note: this is metadata only — no solution data lives here (that's State).
 """
 struct Grid
     N::Int
-    Δx::Float64
+    dx::Float64
     x::Vector{Float64}
     y::Vector{Float64}
     z::Vector{Float64}
@@ -23,12 +23,12 @@ struct Grid
 end
 
 function Grid(N::Int)
-    Δx = 2π / N
-    x = collect(0:Δx:(2π - Δx))
+    dx = 2π / N
+    x = collect(0:dx:(2π - dx))
     y = copy(x)
     z = copy(x)
-    k = fftfreq(N, 1/Δx) .* 2π
-    return Grid(N, Δx, x, y, z, k)
+    k = fftfreq(N, 1/dx) .* 2π
+    return Grid(N, dx, x, y, z, k)
 end
 
 """

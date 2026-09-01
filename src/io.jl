@@ -3,7 +3,7 @@ IO utilities for ERT3D.
 """
 
 using WriteVTK
-using WriteVTK
+
 
 # -------------------------------------------------------------------------
 # Internal helper

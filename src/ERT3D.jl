@@ -30,13 +30,16 @@ include("grid.jl")             # Grid: 2π-periodic Cartesian grid, Δx, wavenum
 include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
 include("physics.jl")          # Primitive variables calculations
 
+# ---- Spatial derivative operators --------------------------------------
+include("derivatives/abstract.jl")
+include("derivatives/central.jl")
+# include("derivatives/spectral.jl")  # add when implemented
 
 # ---- Axis 1: spatial flux formulations --------------------------------
 include("schemes/abstract.jl")         # FluxScheme abstract type + compute_flux interface
-include("schemes/nonconservative.jl")  # D-FE-SF / D-BL-SF, eq. (5)
-include("schemes/conservative_fe.jl")  # C-FE-SF, eq. (13)
-include("schemes/conservative_bl.jl")  # C-BL-SF, eq. (14)
-# include("schemes/conservative_kg.jl") # C-KG-SF, eq. (16) — add later if needed
+include("schemes/direct.jl") 
+include("schemes/Pirozzoli.jl")
+include("schemes/Feiereisen.jl") 
 
 # ---- Axis 2: time integrators ------------------------------------------
 include("integrators/abstract.jl")       # TimeIntegrator abstract type + step! interface
@@ -53,9 +56,52 @@ include("experiment.jl")   # Experiment struct + run_experiment(): forward → r
 include("metrics.jl")      # L2 reconstruction error, K(t) drift, E(k) spectra
 include("io.jl")           # JLD2 checkpointing, VTK export for ParaView/Q-criterion
 
-export Experiment, run_experiment
-export FluxScheme, NonConservative, ConservativeFE, ConservativeBL
-export TimeIntegrator, ExplicitRK3, ExplicitRK4, ImplicitMidpoint
-export taylor_green_ic, synthetic_turbulence_ic
+# ---- Core types ----------------------------------------------------
+
+export Parameters
+export Grid
+export State
+export PrimitiveState
+
+# ---- Spatial derivatives -------------------------------------------
+
+export DerivativeOperator
+export CentralDifference
+export Central4
+export Central6
+export Central8
+export Spectral
+
+export derivative_x!
+export derivative_y!
+export derivative_z!
+
+# ---- Spatial formulations ------------------------------------------
+
+export FluxScheme
+export Direct
+export Pirozzoli
+export Feiereisen
+
+export spatial_operator!
+
+# ---- Time integration ----------------------------------------------
+
+export TimeIntegrator
+export ExplicitRK3
+export ExplicitRK4
+export ImplicitMidpoint
+
+# ---- Initial conditions --------------------------------------------
+
+export taylor_green_ic
+export synthetic_turbulence_ic
+
+# ---- Diagnostics / experiments ------------------------------------
+
+export primitive_variables
+export conserved_variables
+export rms_velocity
+export run_experiment
 
 end # module ERT3D

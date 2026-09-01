@@ -1,16 +1,25 @@
 """
-    taylor_green_ic(grid, params, Mt0)
+    taylor_green_ic(grid, params)
 
-Generate the compressible Taylor–Green vortex initial condition as a State.
+Generate the compressible Taylor-Green vortex initial condition as a State.
+
+Velocity amplitude V0 = 2*Mt0 is chosen so that rms_velocity(state) returns
+exactly Mt0 (see rms_velocity docstring for the convention:
+sqrt(<u²+v²+w²>), matching Honein & Moin 2004's Mt0 = sqrt(3)*u_rms,component
+convention — verified algebraically: <u²+v²+w²> = V0²/4 for this field).
+
+Pressure closure matches the standard compressible TGV benchmark, with
+reference pressure p0 = 1/gamma consistent with the project's nondimensionalization
+(rho0 = T0 = 1 at reference state — see equations note, Section 4).
 """
 function taylor_green_ic(
     grid::Grid,
-    params::Parameters,
-    Mt0::Float64,
+    params::Parameters
 )
-
+    Mt0 = params.Mt0
     gamma = params.gamma
     V0 = 2.0 * Mt0
+    
 
     # Reshape the 1D coordinate vectors so Julia broadcasts them to a full
     # (N × N × N) Cartesian grid without explicitly storing X, Y and Z.
