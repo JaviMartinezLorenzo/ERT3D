@@ -30,56 +30,123 @@ function feiereisen!(
     u::Array{Float64,3},
     v::Array{Float64,3},
     w::Array{Float64,3},
-    phi::Union{Float64,Array{Float64,3}},
+    phi::Array{Float64,3},
     D::DerivativeOperator,
     grid::Grid,
 )
 
     tmp = similar(rho)
+    flux = similar(rho)
 
     # ------------------------------------------------------------
     # x-direction
     # ------------------------------------------------------------
 
-    derivative_x!(tmp, rho .* u .* phi, D, grid)
-    out .= 0.5 .* tmp
+    @. flux = rho * u * phi
+    derivative_x!(tmp, flux, D, grid)
+    @. out = 0.5 * tmp
 
-    derivative_x!(tmp, rho .* u, D, grid)
-    out .+= 0.5 .* phi .* tmp
+    @. flux = rho * u
+    derivative_x!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
 
-    derivative_x!(tmp, phi, D, grid)
-    out .+= 0.5 .* rho .* u .* tmp
+    @. flux = phi
+    derivative_x!(tmp, flux, D, grid)
+    @. out += 0.5 * rho * u * tmp
 
 
     # ------------------------------------------------------------
     # y-direction
     # ------------------------------------------------------------
 
-    derivative_y!(tmp, rho .* v .* phi, D, grid)
-    out .+= 0.5 .* tmp
+    @. flux = rho * v * phi
+    derivative_y!(tmp, flux, D, grid)
+    @. out += 0.5 * tmp
 
-    derivative_y!(tmp, rho .* v, D, grid)
-    out .+= 0.5 .* phi .* tmp
+    @. flux = rho * v
+    derivative_y!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
 
-    derivative_y!(tmp, phi, D, grid)
-    out .+= 0.5 .* rho .* v .* tmp
+    @. flux = phi
+    derivative_y!(tmp, flux, D, grid)
+    @. out += 0.5 * rho * v * tmp
 
 
     # ------------------------------------------------------------
     # z-direction
     # ------------------------------------------------------------
 
-    derivative_z!(tmp, rho .* w .* phi, D, grid)
-    out .+= 0.5 .* tmp
+    @. flux = rho * w * phi
+    derivative_z!(tmp, flux, D, grid)
+    @. out += 0.5 * tmp
 
-    derivative_z!(tmp, rho .* w, D, grid)
-    out .+= 0.5 .* phi .* tmp
+    @. flux = rho * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
 
-    derivative_z!(tmp, phi, D, grid)
-    out .+= 0.5 .* rho .* w .* tmp
+    @. flux = phi
+    derivative_z!(tmp, flux, D, grid)
+    @. out += 0.5 * rho * w * tmp
 
     return out
 end
+
+
+function feiereisen!(
+    out::Array{Float64,3},
+    rho::Array{Float64,3},
+    u::Array{Float64,3},
+    v::Array{Float64,3},
+    w::Array{Float64,3},
+    phi::Float64,
+    D::DerivativeOperator,
+    grid::Grid,
+)
+
+    @assert phi == 1.0
+
+    tmp = similar(rho)
+    flux = similar(rho)
+
+    # ------------------------------------------------------------
+    # x-direction
+    # ------------------------------------------------------------
+
+    @. flux = rho * u * phi
+    derivative_x!(tmp, flux, D, grid)
+    @. out = 0.5 * tmp
+
+    @. flux = rho * u
+    derivative_x!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
+
+    # ------------------------------------------------------------
+    # y-direction
+    # ------------------------------------------------------------
+
+    @. flux = rho * v * phi
+    derivative_y!(tmp, flux, D, grid)
+    @. out += 0.5 * tmp
+
+    @. flux = rho * v
+    derivative_y!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
+
+    # ------------------------------------------------------------
+    # z-direction
+    # ------------------------------------------------------------
+
+    @. flux = rho * w * phi
+    derivative_z!(tmp, flux, D, grid)
+    @. out += 0.5 * tmp
+
+    @. flux = rho * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out += 0.5 * phi * tmp
+
+    return out
+end
+
 
 function spatial_operator!(
     out::State,
@@ -89,5 +156,137 @@ function spatial_operator!(
     grid::Grid,
     params::Parameters,
 )
-    # implementation
+
+    # ------------------------------------------------------------
+    # Primitive variables
+    # ------------------------------------------------------------
+
+    primitive = primitive_variables(state, params)
+
+    rho = primitive.rho
+    u   = primitive.u
+    v   = primitive.v
+    w   = primitive.w
+    p   = primitive.p
+
+    rhoE = state.rhoE
+    
+    # Pre-allocate arrays used directly in spatial_operator!
+    tmp = similar(rho)
+    H   = similar(rho)
+
+    # In-place broadcast for enthalpy calculation
+    @. H = (rhoE + p) / rho
+
+
+    # ------------------------------------------------------------
+    # Continuity φ = 1
+    # ------------------------------------------------------------
+
+    feiereisen!(
+        out.rho,
+        rho,
+        u,
+        v,
+        w,
+        1.0,
+        D,
+        grid,
+    )
+
+
+    # ------------------------------------------------------------
+    # x-momentum φ = u
+    # ------------------------------------------------------------
+
+    feiereisen!(
+        out.rhou,
+        rho,
+        u,
+        v,
+        w,
+        u,
+        D,
+        grid,
+    )
+
+    # Pressure contribution
+    derivative_x!(
+        tmp,
+        p,
+        D,
+        grid,
+    )
+
+    @. out.rhou += tmp
+
+
+    # ------------------------------------------------------------
+    # y-momentum φ = v
+    # ------------------------------------------------------------
+
+    feiereisen!(
+        out.rhov,
+        rho,
+        u,
+        v,
+        w,
+        v,
+        D,
+        grid,
+    )
+
+    # Pressure contribution
+    derivative_y!(
+        tmp,
+        p,
+        D,
+        grid,
+    )
+
+    @. out.rhov += tmp
+
+
+    # ------------------------------------------------------------
+    # z-momentum φ = w
+    # ------------------------------------------------------------
+
+    feiereisen!(
+        out.rhow,
+        rho,
+        u,
+        v,
+        w,
+        w,
+        D,
+        grid,
+    )
+
+    # Pressure contribution
+    derivative_z!(
+        tmp,
+        p,
+        D,
+        grid,
+    )
+
+    @. out.rhow += tmp
+
+
+    # ------------------------------------------------------------
+    # Energy φ = H
+    # ------------------------------------------------------------
+
+    feiereisen!(
+        out.rhoE,
+        rho,
+        u,
+        v,
+        w,
+        H,
+        D,
+        grid,
+    )
+
+    return out
 end

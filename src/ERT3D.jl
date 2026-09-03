@@ -37,7 +37,7 @@ include("derivatives/central.jl")
 
 # ---- Axis 1: spatial flux formulations --------------------------------
 include("schemes/abstract.jl")         # FluxScheme abstract type + compute_flux interface
-include("schemes/direct.jl") 
+include("schemes/Direct.jl") 
 include("schemes/Pirozzoli.jl")
 include("schemes/Feiereisen.jl") 
 

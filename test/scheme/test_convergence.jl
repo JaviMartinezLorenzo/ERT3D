@@ -36,20 +36,19 @@ end
 
 
 # ================================================================
-# Exact continuous Pirozzoli operator
+# Exact continuous convective operator
 #
-# For smooth continuous fields, the Pirozzoli split form is
-# algebraically equivalent to the derivative of
+# For smooth continuous fields, both the KennedyGruber and Feiereisen
+# split forms are algebraically equivalent to
 #
-#     rho*u_j*phi
+#     ∂(ρuⱼφ)/∂xⱼ
 #
 # summed over j = x,y,z.
 #
-# The numerical Pirozzoli operator is NOT replaced by this form;
-# this is only the analytical reference used for the test.
+# This is only the analytical reference used for verification.
 # ================================================================
 
-function exact_pirozzoli(
+function exact_convective_operator(
     rho,
     u,
     v,
@@ -99,7 +98,6 @@ function exact_pirozzoli(
         rho .* dw_dz .* phi .+
         rho .* w .* dphi_dz
 
-
     return dx .+ dy .+ dz
 end
 
@@ -107,12 +105,12 @@ end
 # ================================================================
 # Test continuity specialization
 #
-# Compare the specialized phi = 1 implementation against the
-# general Pirozzoli implementation with phi represented by a
-# three-dimensional array of ones.
+# Compare the specialized φ = 1 implementation against the
+# generic implementation with φ represented by a 3D array of ones.
 # ================================================================
 
 function continuity_specialization_error(
+    scheme,
     grid::Grid,
     D::DerivativeOperator,
 )
@@ -125,7 +123,7 @@ function continuity_specialization_error(
     specialized = zeros(size(rho))
     general     = zeros(size(rho))
 
-    ERT3D.pirozzoli!(
+    scheme(
         specialized,
         rho,
         u,
@@ -136,7 +134,7 @@ function continuity_specialization_error(
         grid,
     )
 
-    ERT3D.pirozzoli!(
+    scheme(
         general,
         rho,
         u,
@@ -155,16 +153,18 @@ end
 # Main convergence study
 # ================================================================
 
-function convergence_study()
-
-    resolutions = [16, 32, 64, 128]
+function convergence_study(
+    scheme;
+    name,
+    resolutions = [16, 32, 64, 128],
+)
 
     errors = Float64[]
     continuity_errors = Float64[]
 
     println()
-    println("Pirozzoli split-form verification")
-    println("=================================")
+    println("$name split-form verification")
+    println("=" ^ (length(name) + 27))
     println()
 
     for N in resolutions
@@ -184,12 +184,12 @@ function convergence_study()
             test_fields(grid)
 
         # --------------------------------------------------------
-        # Numerical Pirozzoli operator
+        # Numerical split-form operator
         # --------------------------------------------------------
 
         numerical = zeros(size(rho))
 
-        ERT3D.pirozzoli!(
+        scheme(
             numerical,
             rho,
             u,
@@ -204,16 +204,17 @@ function convergence_study()
         # Exact analytical result
         # --------------------------------------------------------
 
-        exact = exact_pirozzoli(
-            rho,
-            u,
-            v,
-            w,
-            phi,
-            X,
-            Y,
-            Z,
-        )
+        exact =
+            exact_convective_operator(
+                rho,
+                u,
+                v,
+                w,
+                phi,
+                X,
+                Y,
+                Z,
+            )
 
         error = maximum(abs.(numerical .- exact))
 
@@ -224,7 +225,11 @@ function convergence_study()
         # --------------------------------------------------------
 
         continuity_error =
-            continuity_specialization_error(grid, D)
+            continuity_specialization_error(
+                scheme,
+                grid,
+                D,
+            )
 
         push!(continuity_errors, continuity_error)
 
@@ -272,7 +277,7 @@ function convergence_study()
         ylabel = "L∞ error",
         xscale = log2,
         yscale = log10,
-        title = "Pirozzoli split-form convergence — Central4",
+        title = "$name split-form convergence — Central8",
     )
 
     lines!(
@@ -280,7 +285,7 @@ function convergence_study()
         resolutions,
         errors,
         linewidth = 2,
-        label = "Pirozzoli",
+        label = name,
     )
 
     scatter!(
@@ -294,15 +299,17 @@ function convergence_study()
         position = :lb,
     )
 
+    filename = "test_$(lowercase(name))_convergence.png"
+
     save(
-        "test_pirozzoli_convergence.png",
+        filename,
         fig,
         px_per_unit = 2,
     )
 
     println()
     println("Figure saved to:")
-    println("test_pirozzoli_convergence.png")
+    println(filename)
     println()
 
     return resolutions, errors, continuity_errors
@@ -313,4 +320,12 @@ end
 # Run
 # ================================================================
 
-convergence_study()
+convergence_study(
+    ERT3D.KennedyGruber!;
+    name = "KennedyGruber",
+)
+
+convergence_study(
+    ERT3D.feiereisen!;
+    name = "Feiereisen",
+)

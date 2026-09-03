@@ -6,19 +6,17 @@ using Printf
 # 1. Constant-state preservation
 # ================================================================
 
-function test_constant_state()
+function test_constant_state(scheme; name)
 
     println()
-    println("1. Constant-state preservation")
-    println("================================")
+    println("1. Constant-state preservation — $name")
+    println("========================================")
 
     for N in (16, 32, 64)
 
         grid = Grid(N)
-        params = ERT3D.Parameters(1.4, 0.07)
+        params = Parameters(1.4, 0.07)
 
-        state = State(grid)
-        out = State(grid)
         primitive = PrimitiveState(grid)
 
         # Uniform physical state
@@ -29,12 +27,13 @@ function test_constant_state()
         @. primitive.p   = 1.0 / params.gamma
 
         state = conserved_variables(primitive, params)
+        out = State(grid)
 
         D = Central4(grid)
 
         spatial_operator!(
             out,
-            Pirozzoli(),
+            scheme,
             state,
             D,
             grid,
@@ -62,11 +61,11 @@ end
 # 2. Global conservation
 # ================================================================
 
-function test_global_conservation()
+function test_global_conservation(scheme; name)
 
     println()
-    println("2. Global conservation")
-    println("=======================")
+    println("2. Global conservation — $name")
+    println("==============================")
 
     for N in (16, 32, 64)
 
@@ -81,7 +80,7 @@ function test_global_conservation()
 
         spatial_operator!(
             out,
-            Pirozzoli(),
+            scheme,
             state,
             D,
             grid,
@@ -108,14 +107,14 @@ end
 
 
 # ================================================================
-# 3. Direct vs Pirozzoli
+# 3. Direct vs scheme
 # ================================================================
 
-function test_direct_vs_pirozzoli()
+function test_direct_vs_scheme(scheme; name)
 
     println()
-    println("3. Direct vs Pirozzoli")
-    println("=======================")
+    println("3. Direct vs $name")
+    println("==================")
 
     for N in (16, 32, 64)
 
@@ -125,7 +124,7 @@ function test_direct_vs_pirozzoli()
         state = taylor_green_ic(grid, params)
 
         direct = State(grid)
-        pirozzoli = State(grid)
+        split = State(grid)
 
         D = Central4(grid)
 
@@ -139,8 +138,8 @@ function test_direct_vs_pirozzoli()
         )
 
         spatial_operator!(
-            pirozzoli,
-            Pirozzoli(),
+            split,
+            scheme,
             state,
             D,
             grid,
@@ -148,16 +147,17 @@ function test_direct_vs_pirozzoli()
         )
 
         difference = maximum([
-            maximum(abs.(direct.rho   .- pirozzoli.rho)),
-            maximum(abs.(direct.rhou  .- pirozzoli.rhou)),
-            maximum(abs.(direct.rhov  .- pirozzoli.rhov)),
-            maximum(abs.(direct.rhow  .- pirozzoli.rhow)),
-            maximum(abs.(direct.rhoE  .- pirozzoli.rhoE)),
+            maximum(abs.(direct.rho  .- split.rho)),
+            maximum(abs.(direct.rhou .- split.rhou)),
+            maximum(abs.(direct.rhov .- split.rhov)),
+            maximum(abs.(direct.rhow .- split.rhow)),
+            maximum(abs.(direct.rhoE .- split.rhoE)),
         ])
 
         @printf(
-            "N = %3d    ||Direct - Pirozzoli||∞ = %.6e\n",
+            "N = %3d    ||Direct - %s||∞ = %.6e\n",
             N,
+            name,
             difference,
         )
     end
@@ -168,6 +168,33 @@ end
 # Run tests
 # ================================================================
 
-test_constant_state()
-test_global_conservation()
-test_direct_vs_pirozzoli()
+test_constant_state(
+    KennedyGruber();
+    name = "KennedyGruber",
+)
+
+test_global_conservation(
+    KennedyGruber();
+    name = "KennedyGruber",
+)
+
+test_direct_vs_scheme(
+    KennedyGruber();
+    name = "KennedyGruber",
+)
+
+
+test_constant_state(
+    Feiereisen();
+    name = "Feiereisen",
+)
+
+test_global_conservation(
+    Feiereisen();
+    name = "Feiereisen",
+)
+
+test_direct_vs_scheme(
+    Feiereisen();
+    name = "Feiereisen",
+)

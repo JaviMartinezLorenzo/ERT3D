@@ -1,8 +1,8 @@
 """
-    spatial_operator!(out, ::Pirozzoli, state, D, grid, params)
+    spatial_operator!(out, ::KennedyGruber, state, D, grid, params)
 
 Compute the spatial contribution of the compressible Euler equations
-using the Pirozzoli split-form spatial discretization.
+using the Direct Kennedy Gruber split-form spatial discretization.
 
 The semi-discrete equations are written as
 
@@ -48,7 +48,7 @@ separately as
 
     ∂(p δᵢⱼ)/∂xⱼ = ∂p/∂xᵢ.
 """
-function pirozzoli!(
+function KennedyGruber!(
     out::Array{Float64,3},
     rho::Array{Float64,3},
     u::Array{Float64,3},
@@ -155,7 +155,7 @@ function pirozzoli!(
     return out
 end
 
-function pirozzoli!(
+function KennedyGruber!(
     out::Array{Float64,3},
     rho::Array{Float64,3},
     u::Array{Float64,3},
@@ -222,7 +222,7 @@ end
 
 function spatial_operator!(
     out::State,
-    ::Pirozzoli,
+    ::KennedyGruber,
     state::State,
     D::DerivativeOperator,
     grid::Grid,
@@ -255,7 +255,7 @@ function spatial_operator!(
     # Continuity φ = 1
     # ------------------------------------------------------------
 
-    pirozzoli!(
+    KennedyGruber!(
         out.rho,
         rho,
         u,
@@ -271,7 +271,7 @@ function spatial_operator!(
     # x-momentum φ = u
     # ------------------------------------------------------------
 
-    pirozzoli!(
+    KennedyGruber!(
         out.rhou,
         rho,
         u,
@@ -297,7 +297,7 @@ function spatial_operator!(
     # y-momentum φ = v
     # ------------------------------------------------------------
 
-    pirozzoli!(
+    KennedyGruber!(
         out.rhov,
         rho,
         u,
@@ -323,7 +323,7 @@ function spatial_operator!(
     # z-momentum φ = w
     # ------------------------------------------------------------
 
-    pirozzoli!(
+    KennedyGruber!(
         out.rhow,
         rho,
         u,
@@ -349,7 +349,7 @@ function spatial_operator!(
     # Energy φ = H
     # ------------------------------------------------------------
 
-    pirozzoli!(
+    KennedyGruber!(
         out.rhoE,
         rho,
         u,

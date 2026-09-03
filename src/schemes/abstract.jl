@@ -12,7 +12,7 @@ discretization to be varied independently.
 Implemented formulations include:
 
 - `Direct`      — direct discretization of the original Euler equations.
-- `Pirozzoli`   — split formulation following Pirozzoli.
+- `KennedyGruber`   — split formulation following KennedyGruber.
 - `Feiereisen`  — formulation following Feiereisen et al.
 
 A concrete subtype must implement:
@@ -38,6 +38,6 @@ function spatial_operator! end
 
 struct Direct <: FluxScheme end
 
-struct Pirozzoli <: FluxScheme end
+struct KennedyGruber <: FluxScheme end
 
 struct Feiereisen <: FluxScheme end

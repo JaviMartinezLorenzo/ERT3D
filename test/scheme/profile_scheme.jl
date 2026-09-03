@@ -1,7 +1,7 @@
 using ERT3D
 using BenchmarkTools
 
-function profile_pirozzoli()
+function profile_scheme(scheme)
 
     for N in (32, 64, 128)
 
@@ -24,7 +24,7 @@ function profile_pirozzoli()
 
         out = similar(rho)
 
-        @btime ERT3D.pirozzoli!(
+        @btime $scheme(
             $out,
             $rho,
             $u,
@@ -37,4 +37,5 @@ function profile_pirozzoli()
     end
 end
 
-profile_pirozzoli()
+profile_scheme(ERT3D.KennedyGruber!)
+profile_scheme(ERT3D.feiereisen!)
