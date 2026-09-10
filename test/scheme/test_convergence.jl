@@ -122,6 +122,7 @@ function continuity_specialization_error(
 
     specialized = zeros(size(rho))
     general     = zeros(size(rho))
+    workspace = ERT3D.SpatialWorkspace(grid)
 
     scheme(
         specialized,
@@ -132,6 +133,7 @@ function continuity_specialization_error(
         1.0,
         D,
         grid,
+        workspace
     )
 
     scheme(
@@ -143,6 +145,7 @@ function continuity_specialization_error(
         phi,
         D,
         grid,
+        workspace
     )
 
     return maximum(abs.(specialized .- general))
@@ -175,6 +178,7 @@ function convergence_study(
 
         grid = Grid(N)
         D = Central8(grid)
+        workspace = ERT3D.SpatialWorkspace(grid)
 
         # --------------------------------------------------------
         # Test fields
@@ -198,6 +202,7 @@ function convergence_study(
             phi,
             D,
             grid,
+            workspace
         )
 
         # --------------------------------------------------------
@@ -299,7 +304,7 @@ function convergence_study(
         position = :lb,
     )
 
-    filename = "test_$(lowercase(name))_convergence.png"
+    filename = "figures/test_$(lowercase(name))_convergence.png"
 
     save(
         filename,

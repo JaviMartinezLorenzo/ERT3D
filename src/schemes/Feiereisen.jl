@@ -1,5 +1,13 @@
 """
-    spatial_operator!(out, ::Feiereisen, state, D, grid, params)
+    spatial_operator!(
+        out,
+        ::Feiereisen,
+        state,
+        D,
+        grid,
+        params,
+        workspace,
+    )
 
 Compute the spatial contribution of the compressible Euler equations
 using the Feiereisen et al. split formulation.
@@ -11,18 +19,22 @@ The generic convective term is written as
       + 1/2 φ ∂(ρuⱼ)/∂xⱼ
       + 1/2 ρuⱼ ∂φ/∂xⱼ.
 
-The scalar φ is chosen as:
+The scalar `φ` is chosen as:
 
-- φ = 1        for continuity
-- φ = u, v, w  for the three momentum equations
-- φ = H        for the energy equation
+- `φ = 1`        for continuity
+- `φ = u, v, w`  for the three momentum equations
+- `φ = H`        for the energy equation
 
-where H is the total specific enthalpy,
+where `H` is the total specific enthalpy,
 
     H = E + p/ρ.
 
 The spatial derivative operator is supplied independently through
 a `DerivativeOperator`.
+
+The `workspace` provides reusable storage for primitive variables
+and temporary arrays, avoiding repeated allocation during spatial
+operator evaluations.
 """
 function feiereisen!(
     out::Array{Float64,3},
@@ -33,10 +45,11 @@ function feiereisen!(
     phi::Array{Float64,3},
     D::DerivativeOperator,
     grid::Grid,
+    workspace::SpatialWorkspace,
 )
 
-    tmp = similar(rho)
-    flux = similar(rho)
+    tmp  = workspace.tmp
+    flux = workspace.flux
 
     # ------------------------------------------------------------
     # x-direction
@@ -101,12 +114,13 @@ function feiereisen!(
     phi::Float64,
     D::DerivativeOperator,
     grid::Grid,
+    workspace::SpatialWorkspace,
 )
 
     @assert phi == 1.0
 
-    tmp = similar(rho)
-    flux = similar(rho)
+    tmp  = workspace.tmp
+    flux = workspace.flux
 
     # ------------------------------------------------------------
     # x-direction
@@ -120,6 +134,7 @@ function feiereisen!(
     derivative_x!(tmp, flux, D, grid)
     @. out += 0.5 * phi * tmp
 
+
     # ------------------------------------------------------------
     # y-direction
     # ------------------------------------------------------------
@@ -131,6 +146,7 @@ function feiereisen!(
     @. flux = rho * v
     derivative_y!(tmp, flux, D, grid)
     @. out += 0.5 * phi * tmp
+
 
     # ------------------------------------------------------------
     # z-direction
@@ -155,13 +171,20 @@ function spatial_operator!(
     D::DerivativeOperator,
     grid::Grid,
     params::Parameters,
+    workspace::SpatialWorkspace,
 )
 
     # ------------------------------------------------------------
     # Primitive variables
     # ------------------------------------------------------------
 
-    primitive = primitive_variables(state, params)
+    primitive_variables!(
+        workspace.primitive,
+        state,
+        params,
+    )
+
+    primitive = workspace.primitive
 
     rho = primitive.rho
     u   = primitive.u
@@ -170,12 +193,15 @@ function spatial_operator!(
     p   = primitive.p
 
     rhoE = state.rhoE
-    
-    # Pre-allocate arrays used directly in spatial_operator!
-    tmp = similar(rho)
-    H   = similar(rho)
 
-    # In-place broadcast for enthalpy calculation
+
+    # ------------------------------------------------------------
+    # Workspace
+    # ------------------------------------------------------------
+
+    tmp = workspace.tmp
+    H   = workspace.H
+
     @. H = (rhoE + p) / rho
 
 
@@ -192,6 +218,7 @@ function spatial_operator!(
         1.0,
         D,
         grid,
+        workspace,
     )
 
 
@@ -208,9 +235,9 @@ function spatial_operator!(
         u,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_x!(
         tmp,
         p,
@@ -234,9 +261,9 @@ function spatial_operator!(
         v,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_y!(
         tmp,
         p,
@@ -260,9 +287,9 @@ function spatial_operator!(
         w,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_z!(
         tmp,
         p,
@@ -286,7 +313,13 @@ function spatial_operator!(
         H,
         D,
         grid,
+        workspace,
     )
 
+    @. out.rho  = -out.rho
+    @. out.rhou = -out.rhou
+    @. out.rhov = -out.rhov
+    @. out.rhow = -out.rhow
+    @. out.rhoE = -out.rhoE
     return out
 end

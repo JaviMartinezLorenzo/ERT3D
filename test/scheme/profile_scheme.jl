@@ -10,6 +10,7 @@ function profile_scheme(scheme)
 
         grid = Grid(N)
         D = Central4(grid)
+        workspace = ERT3D.SpatialWorkspace(grid)
 
         X = reshape(grid.x, :, 1, 1)
         Y = reshape(grid.y, 1, :, 1)
@@ -33,6 +34,7 @@ function profile_scheme(scheme)
             $phi,
             $D,
             $grid,
+            $workspace,
         )
     end
 end

@@ -70,3 +70,34 @@ function reverse_velocity!(state::State)
     state.rhow .*= -1
     return state
 end
+
+function primitive_variables!(
+    out::PrimitiveState,
+    state::State,
+    params::Parameters,
+)
+
+    gamma = params.gamma
+
+    rho  = state.rho
+    rhou = state.rhou
+    rhov = state.rhov
+    rhow = state.rhow
+    rhoE = state.rhoE
+
+    @. out.rho = rho
+    @. out.u   = rhou / rho
+    @. out.v   = rhov / rho
+    @. out.w   = rhow / rho
+
+    @. out.p = (gamma - 1.0) * (
+        rhoE -
+        0.5 * (
+            rhou * out.u +
+            rhov * out.v +
+            rhow * out.w
+        )
+    )
+
+    return out
+end

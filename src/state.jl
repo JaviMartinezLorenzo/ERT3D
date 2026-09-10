@@ -32,19 +32,6 @@ function State(grid::Grid)
 end
 
 """
-    copy(state::State)
-
-Deep copy of every conserved field.
-"""
-Base.copy(s::State) = State(
-    copy(s.rho),
-    copy(s.rhou),
-    copy(s.rhov),
-    copy(s.rhow),
-    copy(s.rhoE),
-)
-
-"""
     PrimitiveState
 
 Container for the primitive variables (rho, u, v, w, p) on a
@@ -78,15 +65,71 @@ function PrimitiveState(grid::Grid)
     )
 end
 
-"""
-    copy(state::PrimitiveState)
 
-Deep copy of every primitive field.
 """
-Base.copy(s::PrimitiveState) = PrimitiveState(
-    copy(s.rho),
-    copy(s.u),
-    copy(s.v),
-    copy(s.w),
-    copy(s.p),
+    copy_state!(dest, src)
+
+Copy all conserved variables from `src` into `dest` in-place.
+"""
+function copy_state!(
+    dest::State,
+    src::State,
 )
+    copyto!(dest.rho,  src.rho)
+    copyto!(dest.rhou, src.rhou)
+    copyto!(dest.rhov, src.rhov)
+    copyto!(dest.rhow, src.rhow)
+    copyto!(dest.rhoE, src.rhoE)
+
+    return dest
+end
+
+
+"""
+    axpy!(dest, α, src)
+
+Compute
+
+    dest = dest + α * src
+
+for all conserved variables in-place.
+"""
+function axpy!(
+    dest::State,
+    α::Float64,
+    src::State,
+)
+    @. dest.rho  += α * src.rho
+    @. dest.rhou += α * src.rhou
+    @. dest.rhov += α * src.rhov
+    @. dest.rhow += α * src.rhow
+    @. dest.rhoE += α * src.rhoE
+
+    return dest
+end
+
+
+"""
+    linear_combination!(dest, α, a, β, b)
+
+Compute
+
+    dest = α*a + β*b
+
+for all conserved variables in-place.
+"""
+function linear_combination!(
+    dest::State,
+    α::Float64,
+    a::State,
+    β::Float64,
+    b::State,
+)
+    @. dest.rho  = α * a.rho  + β * b.rho
+    @. dest.rhou = α * a.rhou + β * b.rhou
+    @. dest.rhov = α * a.rhov + β * b.rhov
+    @. dest.rhow = α * a.rhow + β * b.rhow
+    @. dest.rhoE = α * a.rhoE + β * b.rhoE
+
+    return dest
+end

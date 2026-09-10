@@ -29,6 +29,7 @@ include("parameters.jl")
 include("grid.jl")             # Grid: 2π-periodic Cartesian grid, Δx, wavenumbers
 include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
 include("physics.jl")          # Primitive variables calculations
+include("workspace.jl")        # Workspace variables
 
 # ---- Spatial derivative operators --------------------------------------
 include("derivatives/abstract.jl")
@@ -38,7 +39,7 @@ include("derivatives/central.jl")
 # ---- Axis 1: spatial flux formulations --------------------------------
 include("schemes/abstract.jl")         # FluxScheme abstract type + compute_flux interface
 include("schemes/Direct.jl") 
-include("schemes/Pirozzoli.jl")
+include("schemes/KennedyGruber.jl")
 include("schemes/Feiereisen.jl") 
 
 # ---- Axis 2: time integrators ------------------------------------------
@@ -80,7 +81,7 @@ export derivative_z!
 
 export FluxScheme
 export Direct
-export Pirozzoli
+export KennedyGruber
 export Feiereisen
 
 export spatial_operator!
@@ -91,6 +92,8 @@ export TimeIntegrator
 export ExplicitRK3
 export ExplicitRK4
 export ImplicitMidpoint
+
+export step!
 
 # ---- Initial conditions --------------------------------------------
 
@@ -103,5 +106,11 @@ export primitive_variables
 export conserved_variables
 export rms_velocity
 export run_experiment
+
+export copy_state!
+export axpy!
+export linear_combination!
+
+
 
 end # module ERT3D

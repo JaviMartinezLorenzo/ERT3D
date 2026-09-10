@@ -1,14 +1,23 @@
 """
-    spatial_operator!(out, ::Direct, state, D, grid, params)
+    spatial_operator!(
+        out,
+        ::Direct,
+        state,
+        D,
+        grid,
+        params,
+        workspace,
+    )
 
 Compute the spatial contribution of the compressible Euler equations
-using their direct conservative formulation.
+using the direct conservative formulation.
 
 The semi-discrete equations are written as
 
     ∂Q/∂t = -spatial_operator!(...)
 
-where `out` contains the spatial terms for
+where `out` contains the spatial contributions for the five conserved
+variables:
 
     rho
     rhou
@@ -16,8 +25,19 @@ where `out` contains the spatial terms for
     rhow
     rhoE
 
-The derivative operator `D` is independent of the spatial formulation.
-It may be a `Central4`, `Central6`, `Central8`, or `Spectral` operator.
+The convective fluxes are discretized directly as
+
+    ∂(ρu_j φ)/∂x_j
+
+using the supplied `DerivativeOperator`.
+
+The spatial derivative operator `D` is independent of the spatial
+formulation and may be a `Central4`, `Central6`, `Central8`, or
+`Spectral` operator.
+
+The `workspace` provides reusable storage for primitive variables and
+temporary arrays, avoiding repeated allocation during spatial
+operator evaluations.
 """
 function spatial_operator!(
     out::State,
@@ -26,19 +46,26 @@ function spatial_operator!(
     D::DerivativeOperator,
     grid::Grid,
     params::Parameters,
+    workspace::SpatialWorkspace,
 )
 
     # ------------------------------------------------------------
     # Primitive variables
     # ------------------------------------------------------------
 
-    primitive = primitive_variables(state, params)
+    primitive_variables!(
+        workspace.primitive,
+        state,
+        params,
+    )
+
+    primitive = workspace.primitive
 
     rho = primitive.rho
-    u = primitive.u
-    v = primitive.v
-    w = primitive.w
-    p = primitive.p
+    u   = primitive.u
+    v   = primitive.v
+    w   = primitive.w
+    p   = primitive.p
 
     rhoE = state.rhoE
 
@@ -47,183 +74,94 @@ function spatial_operator!(
     # Workspace
     # ------------------------------------------------------------
 
-    tmp = similar(rho)
+    tmp  = workspace.tmp
+    flux = workspace.flux
 
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Continuity
-    #
-    # Rrho =
-    #     ∂(rhou)/∂x
-    #   + ∂(rhov)/∂y
-    #   + ∂(rhow)/∂z
-    # ------------------------------------------------------------
+    # ============================================================
 
-    derivative_x!(
-        out.rho,
-        rho .* u,
-        D,
-        grid,
-    )
+    @. flux = rho * u
+    derivative_x!(out.rho, flux, D, grid)
 
-    derivative_y!(
-        tmp,
-        rho .* v,
-        D,
-        grid,
-    )
+    @. flux = rho * v
+    derivative_y!(tmp, flux, D, grid)
+    @. out.rho += tmp
 
-    out.rho .+= tmp
-
-    derivative_z!(
-        tmp,
-        rho .* w,
-        D,
-        grid,
-    )
-
-    out.rho .+= tmp
+    @. flux = rho * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out.rho += tmp
 
 
-    # ------------------------------------------------------------
+    # ============================================================
     # x-momentum
-    #
-    # Rrhou =
-    #     ∂(rhou² + p)/∂x
-    #   + ∂(rhouv)/∂y
-    #   + ∂(rhouw)/∂z
-    # ------------------------------------------------------------
+    # ============================================================
 
-    derivative_x!(
-        out.rhou,
-        rho .* u .* u .+ p,
-        D,
-        grid,
-    )
+    @. flux = rho * u * u + p
+    derivative_x!(out.rhou, flux, D, grid)
 
-    derivative_y!(
-        tmp,
-        rho .* u .* v,
-        D,
-        grid,
-    )
+    @. flux = rho * u * v
+    derivative_y!(tmp, flux, D, grid)
+    @. out.rhou += tmp
 
-    out.rhou .+= tmp
-
-    derivative_z!(
-        tmp,
-        rho .* u .* w,
-        D,
-        grid,
-    )
-
-    out.rhou .+= tmp
+    @. flux = rho * u * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out.rhou += tmp
 
 
-    # ------------------------------------------------------------
+    # ============================================================
     # y-momentum
-    #
-    # Rrhov =
-    #     ∂(rhouv)/∂x
-    #   + ∂(rhov² + p)/∂y
-    #   + ∂(rhovw)/∂z
-    # ------------------------------------------------------------
+    # ============================================================
 
-    derivative_x!(
-        out.rhov,
-        rho .* u .* v,
-        D,
-        grid,
-    )
+    @. flux = rho * u * v
+    derivative_x!(out.rhov, flux, D, grid)
 
-    derivative_y!(
-        tmp,
-        rho .* v .* v .+ p,
-        D,
-        grid,
-    )
+    @. flux = rho * v * v + p
+    derivative_y!(tmp, flux, D, grid)
+    @. out.rhov += tmp
 
-    out.rhov .+= tmp
-
-    derivative_z!(
-        tmp,
-        rho .* v .* w,
-        D,
-        grid,
-    )
-
-    out.rhov .+= tmp
+    @. flux = rho * v * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out.rhov += tmp
 
 
-    # ------------------------------------------------------------
+    # ============================================================
     # z-momentum
-    #
-    # Rrhow =
-    #     ∂(rhouw)/∂x
-    #   + ∂(rhovw)/∂y
-    #   + ∂(rhow² + p)/∂z
-    # ------------------------------------------------------------
+    # ============================================================
 
-    derivative_x!(
-        out.rhow,
-        rho .* u .* w,
-        D,
-        grid,
-    )
+    @. flux = rho * u * w
+    derivative_x!(out.rhow, flux, D, grid)
 
-    derivative_y!(
-        tmp,
-        rho .* v .* w,
-        D,
-        grid,
-    )
+    @. flux = rho * v * w
+    derivative_y!(tmp, flux, D, grid)
+    @. out.rhow += tmp
 
-    out.rhow .+= tmp
-
-    derivative_z!(
-        tmp,
-        rho .* w .* w .+ p,
-        D,
-        grid,
-    )
-
-    out.rhow .+= tmp
+    @. flux = rho * w * w + p
+    derivative_z!(tmp, flux, D, grid)
+    @. out.rhow += tmp
 
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Energy
-    #
-    # RE =
-    #     ∂((rhoE + p)u)/∂x
-    #   + ∂((rhoE + p)v)/∂y
-    #   + ∂((rhoE + p)w)/∂z
-    # ------------------------------------------------------------
+    # ============================================================
 
-    derivative_x!(
-        out.rhoE,
-        (rhoE .+ p) .* u,
-        D,
-        grid,
-    )
+    @. flux = (rhoE + p) * u
+    derivative_x!(out.rhoE, flux, D, grid)
 
-    derivative_y!(
-        tmp,
-        (rhoE .+ p) .* v,
-        D,
-        grid,
-    )
+    @. flux = (rhoE + p) * v
+    derivative_y!(tmp, flux, D, grid)
+    @. out.rhoE += tmp
 
-    out.rhoE .+= tmp
+    @. flux = (rhoE + p) * w
+    derivative_z!(tmp, flux, D, grid)
+    @. out.rhoE += tmp
 
-    derivative_z!(
-        tmp,
-        (rhoE .+ p) .* w,
-        D,
-        grid,
-    )
-
-    out.rhoE .+= tmp
-
-
+    @. out.rho  = -out.rho
+    @. out.rhou = -out.rhou
+    @. out.rhov = -out.rhov
+    @. out.rhow = -out.rhow
+    @. out.rhoE = -out.rhoE
+    
     return out
 end

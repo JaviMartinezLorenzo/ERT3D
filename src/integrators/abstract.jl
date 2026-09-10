@@ -1,23 +1,54 @@
 """
     TimeIntegrator
 
-Abstract type for temporal advancement schemes. Every concrete subtype
-must implement:
+Abstract supertype for temporal integration operators.
+Concrete subtypes define the numerical method used to advance the
+semi-discrete system in time.
 
-    step!(state::State, dt::Float64, scheme::FluxScheme, integrator::TimeIntegrator, grid::Grid)
-
-which advances `state` in place by one step of size `dt`, calling
-`compute_flux(scheme, state, grid)` internally — the integrator must not
-depend on which FluxScheme is passed in; that's what keeps the two axes
-decoupled.
-
-Key structural distinction for this project:
-  - ExplicitRK3 / ExplicitRK4  -> NOT self-adjoint; Φ_{-Δt} ∘ Φ_{Δt} ≠ id exactly
-  - ImplicitMidpoint            -> exactly self-adjoint (up to round-off);
-                                   this symmetry is the actual mechanism
-                                   being tested against reversibility
 """
 abstract type TimeIntegrator end
 
-# TODO: function step!(state, dt, scheme, integrator::TimeIntegrator, grid) end
-#       (interface documented here; each integrator file provides its own method)
+"""
+    ExplicitRK3
+
+Third-order Shu-Osher explicit Runge-Kutta time integration scheme.
+
+Uses three explicit stages to advance the semi-discrete solution by
+one time step.
+
+"""
+struct ExplicitRK3 <: TimeIntegrator end
+
+"""
+    ExplicitRK4
+
+Fourth-order classical explicit Runge-Kutta time integration scheme.
+
+Uses four explicit stages to advance the semi-discrete solution by
+one time step.
+
+"""
+struct ExplicitRK4 <: TimeIntegrator end
+
+"""
+    ImplicitMidpoint
+
+Second-order implicit midpoint time integration scheme.
+
+A one-stage implicit Runge-Kutta method with a self-adjoint time
+discretization.
+
+"""
+struct ImplicitMidpoint <: TimeIntegrator end
+
+"""
+    GaussLegendre4
+
+Fourth-order two-stage Gauss-Legendre implicit Runge-Kutta time
+integration scheme.
+
+A self-adjoint implicit method based on the two-stage Gauss-Legendre
+collocation scheme.
+
+"""
+struct GaussLegendre4 <: TimeIntegrator end

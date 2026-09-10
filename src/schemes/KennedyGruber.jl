@@ -1,8 +1,16 @@
 """
-    spatial_operator!(out, ::KennedyGruber, state, D, grid, params)
+    spatial_operator!(
+        out,
+        ::KennedyGruber,
+        state,
+        D,
+        grid,
+        params,
+        workspace,
+    )
 
 Compute the spatial contribution of the compressible Euler equations
-using the Direct Kennedy Gruber split-form spatial discretization.
+using the Direct Kennedy–Gruber split-form spatial discretization.
 
 The semi-discrete equations are written as
 
@@ -17,7 +25,7 @@ variables:
     rhow
     rhoE
 
-The convective terms are formulated using the generic split form
+The convective terms are formulated using the generalized split form
 
     ∂(ρuⱼφ)/∂xⱼ =
         1/4 ∂(ρuⱼφ)/∂xⱼ
@@ -30,6 +38,7 @@ The convective terms are formulated using the generic split form
 
 Here `j` denotes the spatial directions `x`, `y`, and `z`, and the
 summation over `j` is evaluated explicitly in the implementation.
+
 The scalar `φ` is chosen according to the conserved equation:
 
 - `φ = 1`        for continuity
@@ -47,6 +56,9 @@ For the momentum equations, the pressure contribution is added
 separately as
 
     ∂(p δᵢⱼ)/∂xⱼ = ∂p/∂xᵢ.
+
+The `workspace` provides reusable storage for primitive variables
+and temporary arrays.
 """
 function KennedyGruber!(
     out::Array{Float64,3},
@@ -57,11 +69,11 @@ function KennedyGruber!(
     phi::Array{Float64,3},
     D::DerivativeOperator,
     grid::Grid,
+    workspace::SpatialWorkspace,
 )
 
-    # Pre-allocate working arrays to eliminate broadcast allocations
-    tmp = similar(rho)
-    flux = similar(rho)
+    tmp  = workspace.tmp
+    flux = workspace.flux
 
     # ============================================================
     # x-direction
@@ -155,6 +167,7 @@ function KennedyGruber!(
     return out
 end
 
+
 function KennedyGruber!(
     out::Array{Float64,3},
     rho::Array{Float64,3},
@@ -164,13 +177,13 @@ function KennedyGruber!(
     phi::Float64,
     D::DerivativeOperator,
     grid::Grid,
+    workspace::SpatialWorkspace,
 )
 
     @assert phi == 1.0
 
-    # Pre-allocate working arrays for the continuity equation
-    tmp = similar(rho)
-    flux = similar(rho)
+    tmp  = workspace.tmp
+    flux = workspace.flux
 
     # ------------------------------------------------------------
     # x-direction
@@ -227,13 +240,20 @@ function spatial_operator!(
     D::DerivativeOperator,
     grid::Grid,
     params::Parameters,
+    workspace::SpatialWorkspace,
 )
 
     # ------------------------------------------------------------
     # Primitive variables
     # ------------------------------------------------------------
 
-    primitive = primitive_variables(state, params)
+    primitive_variables!(
+        workspace.primitive,
+        state,
+        params,
+    )
+
+    primitive = workspace.primitive
 
     rho = primitive.rho
     u   = primitive.u
@@ -242,12 +262,15 @@ function spatial_operator!(
     p   = primitive.p
 
     rhoE = state.rhoE
-    
-    # Pre-allocate arrays used directly in spatial_operator!
-    tmp = similar(rho)
-    H   = similar(rho)
 
-    # In-place broadcast for enthalpy calculation
+
+    # ------------------------------------------------------------
+    # Workspace
+    # ------------------------------------------------------------
+
+    tmp = workspace.tmp
+    H   = workspace.H
+
     @. H = (rhoE + p) / rho
 
 
@@ -264,6 +287,7 @@ function spatial_operator!(
         1.0,
         D,
         grid,
+        workspace,
     )
 
 
@@ -280,9 +304,9 @@ function spatial_operator!(
         u,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_x!(
         tmp,
         p,
@@ -306,9 +330,9 @@ function spatial_operator!(
         v,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_y!(
         tmp,
         p,
@@ -332,9 +356,9 @@ function spatial_operator!(
         w,
         D,
         grid,
+        workspace,
     )
 
-    # Pressure contribution
     derivative_z!(
         tmp,
         p,
@@ -358,7 +382,15 @@ function spatial_operator!(
         H,
         D,
         grid,
+        workspace,
     )
+
+   
+    @. out.rho  = -out.rho
+    @. out.rhou = -out.rhou
+    @. out.rhov = -out.rhov
+    @. out.rhow = -out.rhow
+    @. out.rhoE = -out.rhoE
 
     return out
 end
