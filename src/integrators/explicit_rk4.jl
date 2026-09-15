@@ -7,4 +7,3 @@ O(dt^4) reversibility error and high-wavenumber energy damping separately
 from RK3's, since they're expected to diverge differently even though
 neither is self-adjoint.
 """
-

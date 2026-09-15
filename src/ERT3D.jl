@@ -30,6 +30,7 @@ include("grid.jl")             # Grid: 2π-periodic Cartesian grid, Δx, wavenum
 include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
 include("physics.jl")          # Primitive variables calculations
 include("workspace.jl")        # Workspace variables
+include("simulation.jl")       # Simulation Tools
 
 # ---- Spatial derivative operators --------------------------------------
 include("derivatives/abstract.jl")
@@ -49,6 +50,7 @@ include("integrators/explicit_rk4.jl")   # standard RK4 (asymmetric baseline)
 include("integrators/implicit_midpoint.jl") # symmetric/time-reversible integrator
 
 # ---- Initial conditions -------------------------------------------------
+include("initial_conditions/abstract.jl")     # closed-form TGV velocity field
 include("initial_conditions/taylor_green.jl")     # closed-form TGV velocity field
 include("initial_conditions/synthetic_turbulence.jl") # Pirozzoli §3.1 correctness-gate IC
 
@@ -97,8 +99,7 @@ export step!
 
 # ---- Initial conditions --------------------------------------------
 
-export taylor_green_ic
-export synthetic_turbulence_ic
+export initialize!
 
 # ---- Diagnostics / experiments ------------------------------------
 

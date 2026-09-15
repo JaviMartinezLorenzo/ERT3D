@@ -33,7 +33,9 @@ function test_copy_state()
     grid = Grid(N)
     params = Parameters(1.4, 0.07)
 
-    state = taylor_green_ic(grid, params)
+    state = State(grid)
+    initialize!(state, TaylorGreen(), grid, params)
+
     dest  = State(grid)
 
     copy_state!(dest, state)
@@ -67,7 +69,8 @@ function test_axpy()
     grid = Grid(N)
     params = Parameters(1.4, 0.07)
 
-    a = taylor_green_ic(grid, params)
+    a = State(grid)
+    initialize!(a, TaylorGreen(), grid, params)
     b = State(grid)
 
     @. b.rho  = 0.5

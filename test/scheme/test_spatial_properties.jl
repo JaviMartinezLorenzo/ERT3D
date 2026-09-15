@@ -73,7 +73,8 @@ function test_global_conservation(scheme; name)
         params = Parameters(1.4, 0.07)
 
         # Smooth periodic TGV state
-        state = taylor_green_ic(grid, params)
+        state = State(grid)
+        initialize!(state, TaylorGreen(), grid, params)
         out = State(grid)
 
         D = Central4(grid)
@@ -121,7 +122,8 @@ function test_direct_vs_scheme(scheme; name)
         grid = Grid(N)
         params = Parameters(1.4, 0.07)
 
-        state = taylor_green_ic(grid, params)
+        state = State(grid)
+        initialize!(state, TaylorGreen(), grid, params)
 
         direct = State(grid)
         split = State(grid)
