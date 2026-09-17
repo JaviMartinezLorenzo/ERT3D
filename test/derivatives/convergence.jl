@@ -73,7 +73,7 @@ function convergence_study()
     # Grid spacing
     # ------------------------------------------------------------
 
-    dx = [Grid(N).Δx for N in Ns]
+    dx = [Grid(N).dx for N in Ns]
 
 
     # ------------------------------------------------------------

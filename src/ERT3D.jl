@@ -30,7 +30,6 @@ include("grid.jl")             # Grid: 2π-periodic Cartesian grid, Δx, wavenum
 include("state.jl")            # State: the conserved-variable container (ρ, ρu, ρE)
 include("physics.jl")          # Primitive variables calculations
 include("workspace.jl")        # Workspace variables
-include("simulation.jl")       # Simulation Tools
 
 # ---- Spatial derivative operators --------------------------------------
 include("derivatives/abstract.jl")
@@ -46,13 +45,16 @@ include("schemes/Feiereisen.jl")
 # ---- Axis 2: time integrators ------------------------------------------
 include("integrators/abstract.jl")       # TimeIntegrator abstract type + step! interface
 include("integrators/explicit_rk3.jl")   # Shu-Osher TVD RK3 (matches Pirozzoli's paper)
-include("integrators/explicit_rk4.jl")   # standard RK4 (asymmetric baseline)
-include("integrators/implicit_midpoint.jl") # symmetric/time-reversible integrator
+#include("integrators/explicit_rk4.jl")   # standard RK4 (asymmetric baseline)
+#include("integrators/implicit_midpoint.jl") # symmetric/time-reversible integrator
 
 # ---- Initial conditions -------------------------------------------------
 include("initial_conditions/abstract.jl")     # closed-form TGV velocity field
 include("initial_conditions/taylor_green.jl")     # closed-form TGV velocity field
 include("initial_conditions/synthetic_turbulence.jl") # Pirozzoli §3.1 correctness-gate IC
+
+# Simulation
+include("simulation.jl")
 
 # ---- Experiment orchestration --------------------------------------------
 include("experiment.jl")   # Experiment struct + run_experiment(): forward → reverse → metrics
@@ -99,10 +101,25 @@ export step!
 
 # ---- Initial conditions --------------------------------------------
 
+export InitialCondition
+export TaylorGreen
+export SyntheticTurbulence
 export initialize!
+
+# ---- Workspace --------------------------------------------
+
+export  RK3Workspace
+
+# ---- Simulation --------------------------------------------
+
+export Simulation
+export OutputHook
+export run!
+
 
 # ---- Diagnostics / experiments ------------------------------------
 
+export Diagnostics, record!, save_diagnostics, load_diagnostics
 export primitive_variables
 export conserved_variables
 export rms_velocity

@@ -82,8 +82,8 @@ function derivative_x!(
     N = grid.N
 
     D.xwork[L+1:L+N, :, :] .= f
-    D.xwork[1:L, :, :] .= f[end-L+1:end, :, :]
-    D.xwork[L+N+1:end, :, :] .= f[1:L, :, :]
+    D.xwork[1:L, :, :] .= @view f[end-L+1:end, :, :]
+    D.xwork[L+N+1:end, :, :] .= @view f[1:L, :, :]
 
     inv_dx = 1 / grid.dx
 
@@ -125,8 +125,8 @@ function derivative_y!(
     N = grid.N
 
     D.ywork[:, L+1:L+N, :] .= f
-    D.ywork[:, 1:L, :] .= f[:, end-L+1:end, :]
-    D.ywork[:, L+N+1:end, :] .= f[:, 1:L, :]
+    D.ywork[:, 1:L, :] .= @view f[:, end-L+1:end, :]
+    D.ywork[:, L+N+1:end, :] .= @view f[:, 1:L, :]
 
     inv_dy = 1 / grid.dx
 
@@ -168,8 +168,8 @@ function derivative_z!(
     N = grid.N
 
     D.zwork[:, :, L+1:L+N] .= f
-    D.zwork[:, :, 1:L] .= f[:, :, end-L+1:end]
-    D.zwork[:, :, L+N+1:end] .= f[:, :, 1:L]
+    D.zwork[:, :, 1:L] .= @view f[:, :, end-L+1:end]
+    D.zwork[:, :, L+N+1:end] .= @view f[:, :, 1:L]
 
     inv_dz = 1 / grid.dx
 

@@ -40,6 +40,7 @@ end
 function fire_due_hooks!(hooks::Vector{OutputHook}, sim::Simulation, step::Int)
     for h in hooks
         @assert h.every_n_steps > 0 "every_n_steps must be positive"
+        
         if step % h.every_n_steps == 0
             h.action(sim, step)
         end

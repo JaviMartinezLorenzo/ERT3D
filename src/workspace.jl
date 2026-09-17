@@ -1,3 +1,5 @@
+abstract type TimeIntegratorWorkspace end
+
 """
     SpatialWorkspace
 
@@ -58,7 +60,7 @@ Fields:
 - `rhs`     : reusable spatial right-hand-side storage
 - `spatial` : reusable workspace for the spatial operator
 """
-struct RK3Workspace
+struct RK3Workspace <: TimeIntegratorWorkspace
     stage1::State
     stage2::State
     rhs::State

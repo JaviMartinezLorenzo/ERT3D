@@ -168,7 +168,7 @@ function record!(
 
     state = sim.state
     gamma = sim.params.gamma
-    dV = sim.grid.Δx^3
+    dV = sim.grid.dx^3
 
     mass = 0.0
     momentum_x = 0.0

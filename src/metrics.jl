@@ -164,7 +164,7 @@ function current_cfl(sim::Simulation, dt::Float64)
 
     state = sim.state
     gamma = sim.params.gamma
-    inv_dx = 1.0 / sim.grid.Δx
+    inv_dx = 1.0 / sim.grid.dx
 
     max_cfl = 0.0
 
