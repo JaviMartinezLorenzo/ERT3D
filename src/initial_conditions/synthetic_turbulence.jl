@@ -1,3 +1,19 @@
+"""
+Synthetic isotropic turbulence initial condition.
+
+Generates a random, divergence-free velocity field with target spectrum
+
+    E(k) ∝ (k/k0)^4 exp[-2(k/k0)^2]
+
+as used in the Pirozzoli correctness test.
+
+The field is normalized so that
+
+    u_rms = Mt0
+
+with rho = 1 and uniform initial pressure.
+"""
+
 using FFTW
 using Random
 using Statistics
@@ -10,24 +26,14 @@ using Statistics
 """
     wavenumber_grids(grid)
 
-Construct the three-dimensional Fourier wavenumber grids and their
-magnitude for the periodic computational domain.
-
-The wavenumbers are taken directly from `grid.k`, which must contain
-the FFT-compatible integer wavenumbers for the 2π-periodic domain.
+Construct the 3D Cartesian wavenumber grids and their magnitude.
 """
 function wavenumber_grids(grid::Grid)
-
-    KX = reshape(grid.k, :, 1, 1)
-    KY = reshape(grid.k, 1, :, 1)
-    KZ = reshape(grid.k, 1, 1, :)
-
-    Kmag = sqrt.(
-        KX.^2 .+
-        KY.^2 .+
-        KZ.^2
-    )
-
+    N = grid.N
+    KX = reshape(grid.k, :, 1, 1) .* ones(1, N, N)
+    KY = reshape(grid.k, 1, :, 1) .* ones(N, 1, N)
+    KZ = reshape(grid.k, 1, 1, :) .* ones(N, N, 1)
+    Kmag = sqrt.(KX.^2 .+ KY.^2 .+ KZ.^2)
     return KX, KY, KZ, Kmag
 end
 
@@ -39,16 +45,13 @@ end
 """
     target_spectrum(k, k0)
 
-Target modal spectrum shape,
+Unnormalised target shell spectrum
 
-    E(k) ∝ (k/k0)^4 exp(-2(k/k0)^2).
-
-The overall amplitude is imposed separately by matching the desired
-rms velocity `Mt0`.
+    E(k) ∝ (k/k0)^4 exp[-2(k/k0)^2].
 """
-@inline function target_spectrum(k::Float64, k0::Float64)
+@inline function target_spectrum(k, k0)
 
-    k == 0.0 && return 0.0
+    k == 0 && return 0.0
 
     q = k / k0
 
@@ -56,27 +59,38 @@ rms velocity `Mt0`.
 end
 
 
+# ================================================================
+# Shell indexing
+# ================================================================
+
 """
-    target_mode_amplitude(k, k0)
+    shell_indices(Kmag)
 
-Return the Fourier-mode amplitude corresponding to the target
-spectrum.
-
-For non-zero wavenumbers,
-
-    |û| ∝ sqrt(E(k)) / k.
-
-The absolute normalization is fixed later by the requested rms
-velocity.
+Assign every Fourier mode to an integer wavenumber shell.
 """
-@inline function target_mode_amplitude(
-    k::Float64,
-    k0::Float64,
-)
+function shell_indices(Kmag)
 
-    k == 0.0 && return 0.0
+    return round.(Int, Kmag)
 
-    return sqrt(target_spectrum(k, k0)) / k
+end
+
+
+"""
+    shell_counts(shells)
+
+Count the number of discrete Fourier modes in every shell.
+"""
+function shell_counts(shells)
+
+    kmax = maximum(shells)
+
+    counts = zeros(Int, kmax + 1)
+
+    @inbounds for s in shells
+        counts[s + 1] += 1
+    end
+
+    return counts
 end
 
 
@@ -87,12 +101,12 @@ end
 """
     project_divergence_free!(ux, uy, uz, KX, KY, KZ, Kmag)
 
-Project the Fourier-space velocity field onto the divergence-free
-subspace,
+Project the Fourier-space velocity field onto the solenoidal
+(divergence-free) subspace:
 
-    û ← û - k (k·û)/|k|².
+    u_hat <- u_hat - k (k · u_hat) / |k|²
 
-The zero mode is explicitly set to zero.
+The zero-wavenumber mode is explicitly removed.
 """
 function project_divergence_free!(
     ux,
@@ -104,28 +118,28 @@ function project_divergence_free!(
     Kmag,
 )
 
-    @inbounds for I in eachindex(ux)
+    @inbounds for idx in eachindex(Kmag)
 
-        k2 = Kmag[I]^2
+        k2 = Kmag[idx]^2
 
         if k2 == 0.0
 
-            ux[I] = 0.0
-            uy[I] = 0.0
-            uz[I] = 0.0
+            ux[idx] = 0.0
+            uy[idx] = 0.0
+            uz[idx] = 0.0
 
         else
 
             kdotu =
-                (
-                    ux[I] * KX[I] +
-                    uy[I] * KY[I] +
-                    uz[I] * KZ[I]
-                ) / k2
+                ux[idx] * KX[idx] +
+                uy[idx] * KY[idx] +
+                uz[idx] * KZ[idx]
 
-            ux[I] -= kdotu * KX[I]
-            uy[I] -= kdotu * KY[I]
-            uz[I] -= kdotu * KZ[I]
+            factor = kdotu / k2
+
+            ux[idx] -= factor * KX[idx]
+            uy[idx] -= factor * KY[idx]
+            uz[idx] -= factor * KZ[idx]
 
         end
     end
@@ -141,85 +155,91 @@ end
 """
     shape_to_spectrum!(ux, uy, uz, Kmag, k0)
 
-Rescale each Fourier velocity mode so that its amplitude follows the
-prescribed target spectrum.
-
-The direction and phase of each non-zero mode are retained.
-
-The zero mode is set to zero.
+Rescale the Fourier-space velocity field so that the total energy
+contained in each discrete shell follows the prescribed target
+spectrum.
 """
 function shape_to_spectrum!(
     ux,
     uy,
     uz,
     Kmag,
-    k0::Float64,
+    k0,
 )
 
-    @inbounds for I in eachindex(ux)
+    shells = shell_indices(Kmag)
+    counts = shell_counts(shells)
 
-        k = Kmag[I]
+    kmax = maximum(shells)
 
-        if k == 0.0
+    for k in 1:kmax
 
-            ux[I] = 0.0
-            uy[I] = 0.0
-            uz[I] = 0.0
+        n = counts[k + 1]
 
-            continue
+        # No modes in this shell.
+        n == 0 && continue
+
+        target = target_spectrum(k, k0)
+
+        target == 0.0 && continue
+
+        current_energy = 0.0
+
+        @inbounds for idx in eachindex(shells)
+
+            if shells[idx] == k
+
+                current_energy +=
+                    abs2(ux[idx]) +
+                    abs2(uy[idx]) +
+                    abs2(uz[idx])
+
+            end
         end
 
-        magnitude = sqrt(
-            abs2(ux[I]) +
-            abs2(uy[I]) +
-            abs2(uz[I])
-        )
+        current_energy == 0.0 && continue
 
-        if magnitude == 0.0
+        scale = sqrt(target / current_energy)
 
-            ux[I] = 0.0
-            uy[I] = 0.0
-            uz[I] = 0.0
+        @inbounds for idx in eachindex(shells)
 
-        else
+            if shells[idx] == k
 
-            desired = target_mode_amplitude(k, k0)
-            scale = desired / magnitude
+                ux[idx] *= scale
+                uy[idx] *= scale
+                uz[idx] *= scale
 
-            ux[I] *= scale
-            uy[I] *= scale
-            uz[I] *= scale
-
+            end
         end
     end
+
+    # Remove mean mode explicitly.
+    ux[1, 1, 1] = 0.0
+    uy[1, 1, 1] = 0.0
+    uz[1, 1, 1] = 0.0
 
     return nothing
 end
 
 
 # ================================================================
-# Initial condition
+# Synthetic turbulence initialization
 # ================================================================
 
 """
     initialize!(state, ::SyntheticTurbulence, grid, params)
 
-Initialize the state with synthetic isotropic turbulence.
+Initialize a synthetic isotropic solenoidal turbulent velocity field.
 
-The construction is:
+The procedure is:
 
-1. Generate reproducible Gaussian random velocity fields.
-2. Transform them to Fourier space.
+1. Generate deterministic Gaussian random velocity.
+2. Transform to Fourier space.
 3. Project onto the divergence-free subspace.
-4. Impose the prescribed modal spectrum.
-5. Project again to remove numerical compressible components.
-6. Transform back to physical space.
-7. Remove numerical mean velocity.
-8. Rescale the velocity so that `rms_velocity(state) = params.Mt0`.
-9. Set uniform density and thermodynamic pressure.
-
-This initial condition is intended as a correctness gate for the
-turbulence implementation, not as the primary reversibility case.
+4. Impose the target shell spectrum.
+5. Transform back to physical space.
+6. Normalize the velocity so that `rms_velocity(state) == Mt0`.
+7. Set uniform density and pressure.
 """
 function initialize!(
     state::State,
@@ -227,35 +247,46 @@ function initialize!(
     grid::Grid,
     params::Parameters,
 )
-    Random.seed!(ic.seed)
+
     N = grid.N
+
     gamma = params.gamma
+    Mt0 = params.Mt0
     k0 = params.k0
 
     # ------------------------------------------------------------
-    # Reproducible random field
+    # 1. Deterministic random velocity
     # ------------------------------------------------------------
 
-    rng = MersenneTwister(12345)
+    rng = MersenneTwister(ic.seed)
 
-    ux = fft(randn(rng, N, N, N))
-    uy = fft(randn(rng, N, N, N))
-    uz = fft(randn(rng, N, N, N))
-
-    # ------------------------------------------------------------
-    # Fourier wavenumbers
-    # ------------------------------------------------------------
-
-    KX, KY, KZ, Kmag = wavenumber_grids(grid)
+    u0 = randn(rng, N, N, N)
+    v0 = randn(rng, N, N, N)
+    w0 = randn(rng, N, N, N)
 
     # ------------------------------------------------------------
-    # Solenoidal projection
+    # 2. Fourier transform
+    # ------------------------------------------------------------
+
+    uh = fft(u0)
+    vh = fft(v0)
+    wh = fft(w0)
+
+    # ------------------------------------------------------------
+    # 3. Wavenumber grids
+    # ------------------------------------------------------------
+
+    KX, KY, KZ, Kmag =
+        wavenumber_grids(grid)
+
+    # ------------------------------------------------------------
+    # 4. Divergence-free projection
     # ------------------------------------------------------------
 
     project_divergence_free!(
-        ux,
-        uy,
-        uz,
+        uh,
+        vh,
+        wh,
         KX,
         KY,
         KZ,
@@ -263,96 +294,69 @@ function initialize!(
     )
 
     # ------------------------------------------------------------
-    # Impose target spectrum
+    # 5. Impose target spectrum
     # ------------------------------------------------------------
 
     shape_to_spectrum!(
-        ux,
-        uy,
-        uz,
+        uh,
+        vh,
+        wh,
         Kmag,
         k0,
     )
 
-    # Projection once more removes any numerical longitudinal
-    # component introduced by the spectrum operation.
-    project_divergence_free!(
-        ux,
-        uy,
-        uz,
-        KX,
-        KY,
-        KZ,
-        Kmag,
-    )
-
     # ------------------------------------------------------------
-    # Back to physical space
+    # 6. Transform back to physical space
     # ------------------------------------------------------------
 
-    u = real.(ifft(ux))
-    v = real.(ifft(uy))
-    w = real.(ifft(uz))
+    u = real.(ifft(uh))
+    v = real.(ifft(vh))
+    w = real.(ifft(wh))
 
     # ------------------------------------------------------------
-    # Remove numerical mean
+    # 7. Set uniform density
     # ------------------------------------------------------------
 
-    u .-= mean(u)
-    v .-= mean(v)
-    w .-= mean(w)
+    @. state.rho = 1.0
 
     # ------------------------------------------------------------
-    # Normalize velocity amplitude
+    # 8. Store velocity as momentum
     # ------------------------------------------------------------
 
-    current_rms = sqrt(
-        (
-            sum(abs2, u) +
-            sum(abs2, v) +
-            sum(abs2, w)
-        ) / length(u)
-    )
+    @. state.rhou = u
+    @. state.rhov = v
+    @. state.rhow = w
+
+    # ------------------------------------------------------------
+    # 9. Normalize to desired turbulent Mach number
+    # ------------------------------------------------------------
+
+    current_rms = rms_velocity(state)
 
     @assert current_rms > 0.0
 
-    amplitude = params.Mt0 / current_rms
+    amplitude = Mt0 / current_rms
 
-    u .*= amplitude
-    v .*= amplitude
-    w .*= amplitude
+    @. state.rhou *= amplitude
+    @. state.rhov *= amplitude
+    @. state.rhow *= amplitude
 
     # ------------------------------------------------------------
-    # Conservative variables
+    # 10. Uniform thermodynamic state
+    #
+    # p0 = 1/gamma
+    # rho0 = 1
+    #
+    # rhoE = p/(gamma-1) + 1/2 rho |u|²
     # ------------------------------------------------------------
 
-    rho = state.rho
-    rhou = state.rhou
-    rhov = state.rhov
-    rhow = state.rhow
-    rhoE = state.rhoE
-
-    @. rho = 1.0
-
-    @. rhou = rho * u
-    @. rhov = rho * v
-    @. rhow = rho * w
-
-    # Uniform reference pressure:
-    #
-    #     p0 = 1 / gamma
-    #
-    # therefore
-    #
-    #     rho*e = p0/(gamma-1).
-
-    @. rhoE =
+    @. state.rhoE =
         (1.0 / gamma) / (gamma - 1.0) +
         0.5 * (
-            rhou^2 +
-            rhov^2 +
-            rhow^2
-        ) / rho
+            state.rhou^2 +
+            state.rhov^2 +
+            state.rhow^2
+        ) / state.rho
 
     return state
 end

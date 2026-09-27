@@ -124,10 +124,14 @@ export primitive_variables
 export conserved_variables
 export rms_velocity
 export run_experiment
+export l2_reconstruction_error
 
-export copy_state!
+export reverse_velocity!, copy_state!
 export axpy!
 export linear_combination!
+
+export VTKCollection, add_snapshot!, close_collection!, export_vtk
+export save_checkpoint, load_checkpoint!
 
 
 
