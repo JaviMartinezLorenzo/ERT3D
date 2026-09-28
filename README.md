@@ -10,9 +10,6 @@ The main benchmark is the **three-dimensional inviscid Taylor–Green vortex**, 
 
 The benchmark follows the approach of Duponcheel, Orlandi & Winckelmans and was also inspired by a CFD ParSchool lecture by Prof. Sergio Pirozzoli.
 
-Yes — exactly. Then the Quick Start should be **minimal and reflect the actual way you run the experiments**:
-
-
 ## Quick Start
 
 ### Requirements
