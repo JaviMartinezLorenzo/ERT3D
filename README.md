@@ -1,4 +1,3 @@
-````markdown
 # ERT3D — Euler Reversibility Testbench, 3D
 
 [![Julia](https://img.shields.io/badge/Julia-1.12-%239558B2.svg)](https://julialang.org/)
@@ -11,7 +10,39 @@ The main benchmark is the **three-dimensional inviscid Taylor–Green vortex**, 
 
 The benchmark follows the approach of Duponcheel, Orlandi & Winckelmans and was also inspired by a CFD ParSchool lecture by Prof. Sergio Pirozzoli.
 
----
+Yes — exactly. Then the Quick Start should be **minimal and reflect the actual way you run the experiments**:
+
+
+## Quick Start
+
+### Requirements
+
+- Julia 1.12 or later
+
+### Setup
+
+From the repository root, start Julia with the project environment:
+
+```bash
+julia --project=.
+````
+
+Instantiate the dependencies once:
+
+```julia
+using Pkg
+Pkg.instantiate()
+```
+
+### Run
+
+Experiments and post-processing scripts can then be executed directly from the Julia REPL:
+
+```julia
+include("scripts/02_reversibility_run.jl")
+```
+
+See [`scripts/`](scripts/) for the available experiment scripts.
 
 ## Overview
 
@@ -267,8 +298,6 @@ data/
 ├── processed/                   # Figures and visualizations
 └── reference/                   # Reference / digitized data
 
-docs/
-└── design.md                   # Design and implementation notes
 
 scripts/                         # Reproducible simulations and plotting
 ```

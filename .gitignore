@@ -40,3 +40,12 @@ JuliaLocalPreferences.toml
 *.pvtp
 *.pvtu
 *.pvd
+
+
+# Local plotting / post-processing scripts
+scripts/plot_*.jl
+scripts/plot*.jl
+
+
+# Generated PDF figures
+data/processed/*.pdf
