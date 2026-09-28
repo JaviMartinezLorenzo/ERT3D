@@ -108,3 +108,11 @@ function run!(
 
     return sim
 end
+
+function compatible_dt(t_end, dt_target)
+    nsteps = round(Int, t_end / dt_target)
+
+    @assert nsteps > 0
+
+    return t_end / nsteps
+end

@@ -129,10 +129,30 @@ export l2_reconstruction_error
 export reverse_velocity!, copy_state!
 export axpy!
 export linear_combination!
+export compatible_dt
 
 export VTKCollection, add_snapshot!, close_collection!, export_vtk
 export save_checkpoint, load_checkpoint!
 
+# ---- Module initialization ------------------------------------------
+"""
+    __init__()
+
+Runs once, automatically, whenever ERT3D is loaded — not at package
+precompile time, but at actual load/using time in each session.
+Prints a short interactive-only load message.
+"""
+function __init__()
+    if isinteractive()
+        println(
+        """
+        \n
+        Euler Reversibility Testbench 3D
+        ─────────────────────────────────
+        Version 0.1.0
+        """)
+    end
+end
 
 
 end # module ERT3D

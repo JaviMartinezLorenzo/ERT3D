@@ -1,8 +1,15 @@
 using ERT3D
 
-N = 64
-dt = 2.5e-2
-t_rev = 8.0
+# ============================================================
+# Simulation parameters
+# ============================================================
+
+N = 32
+dt_target = 0.025
+t_rev = 0.05
+
+dt = compatible_dt(t_rev, dt_target)
+nsteps = round(Int, t_rev / dt)
 
 grid = Grid(N)
 
@@ -19,10 +26,23 @@ state = State(grid)
 
 initialize!(
     state,
-    TaylorGreen(),
+    SyntheticTurbulence(),
     grid,
     params,
 )
+
+coll = VTKCollection("data/processed/initial_condition")
+
+add_snapshot!(
+    coll,
+    sim.state,
+    sim.grid,
+    sim.params,
+    sim.derivative,
+    sim.t,
+)
+
+close_collection!(coll)
 
 workspace = RK3Workspace(grid)
 
@@ -36,11 +56,39 @@ sim = Simulation(
     workspace = workspace,
 )
 
+# Preserve the initial state for the final reconstruction test
 s0 = State(grid)
 copy_state!(s0, state)
 
+# ============================================================
+# Output configuration
+# ============================================================
+
 diagnostics = Diagnostics()
-coll = VTKCollection("data/processed/reversibility")
+
+# Optional VTK output for visualization:
+#
+# coll = VTKCollection("data/processed/reversibility")
+#
+# hooks = [
+#     OutputHook(
+#         "diagnostics",
+#         1,
+#         (sim, step) -> record!(diagnostics, sim),
+#     ),
+#     OutputHook(
+#         "vtk",
+#         2,
+#         (sim, step) -> add_snapshot!(
+#             coll,
+#             sim.state,
+#             sim.grid,
+#             sim.params,
+#             sim.derivative,
+#             sim.t,
+#         ),
+#     ),
+# ]
 
 hooks = [
     OutputHook(
@@ -48,19 +96,34 @@ hooks = [
         1,
         (sim, step) -> record!(diagnostics, sim),
     ),
-    OutputHook(
-        "vtk",
-        2,
-        (sim, step) -> add_snapshot!(coll, sim.state, sim.grid, sim.params, sim.derivative, sim.t),
-    ),
 ]
 
+# ============================================================
+# Simulation information
+# ============================================================
 
-# ------------------------------------------------------------
-# Forward leg: 0 -> t_rev
-# ------------------------------------------------------------
+println()
+println("============================================================")
+println("ERT3D — TIME REVERSIBILITY TEST")
+println("============================================================")
+println("Initial condition : Taylor–Green vortex")
+println("Grid              : $(N)^3")
+println("Mach number       : $(params.Mt0)")
+println("Spatial scheme    : $(nameof(typeof(scheme)))")
+println("Derivative        : $(nameof(typeof(derivative)))")
+println("Time integrator   : $(nameof(typeof(integrator)))")
+println("dt                : $(dt)")
+println("Reversal time     : $(t_rev)")
+println("Steps per leg     : $(nsteps)")
+println("Total steps       : $(2 * nsteps)")
+println("============================================================")
+println()
 
-println("Forward leg: t = 0 -> $t_rev")
+# ============================================================
+# Forward leg
+# ============================================================
+
+println("Forward evolution: 0 → $t_rev")
 
 run!(
     sim,
@@ -70,15 +133,22 @@ run!(
     verbose = true,
 )
 
-save_checkpoint(sim, "data/raw/reversibility/ckpt_reversal.jld2")
+# Optional checkpoint at the reversal point:
+#
+# save_checkpoint(
+#     sim,
+#     "data/raw/reversibility/ckpt_reversal.jld2",
+# )
 
-# ------------------------------------------------------------
-# Reversal: flip velocity, run forward again for the same duration
-# ------------------------------------------------------------
+# ============================================================
+# Velocity reversal + reversed leg
+# ============================================================
+
+println()
+println("Velocity reversal at t = $t_rev")
+println("Reversed evolution: $t_rev → $(2 * t_rev)")
 
 reverse_velocity!(sim.state)
-
-println("Reversed leg: t = $t_rev -> $(2*t_rev)")
 
 run!(
     sim,
@@ -88,19 +158,31 @@ run!(
     verbose = true,
 )
 
-close_collection!(coll)
+# Optional VTK output:
+#
+# close_collection!(coll)
 
-# ------------------------------------------------------------
-# Reconstruction error and diagnostics
-# ------------------------------------------------------------
+# ============================================================
+# Reconstruction error
+# ============================================================
+
+# Restore the original velocity direction before comparing
+# the final state with the initial state.
+reverse_velocity!(sim.state)
 
 error = l2_reconstruction_error(s0, sim.state)
-println()
-println("L2 reconstruction error at t = $(2*t_rev): $error")
 
 save_diagnostics(
     diagnostics,
     "data/raw/reversibility/diagnostics.jld2",
 )
 
-println("Run complete. Final t = $(sim.t), $(length(diagnostics.t)) diagnostic records saved.")
+println()
+println("============================================================")
+println("REVERSIBILITY RESULT")
+println("============================================================")
+println("Final time        : $(sim.t)")
+println("L2 reconstruction : $(error)")
+println("Diagnostic records: $(length(diagnostics.t))")
+println("============================================================")
+println()

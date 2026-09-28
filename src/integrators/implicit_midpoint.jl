@@ -16,9 +16,7 @@ Implementation notes:
     reasonably for this system size before committing further design
     around it; if not, revisit tolerance/method choice early.
 """
-struct ImplicitMidpoint <: TimeIntegrator
-    tol::Float64
-end
+
 
 # TODO: step!(state, dt, scheme, integrator::ImplicitMidpoint, grid)
 #       build residual function R(state_{n+1}) = state_{n+1} - state_n - dt*F(midpoint)

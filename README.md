@@ -3,49 +3,55 @@
 
 [![Julia](https://img.shields.io/badge/Julia-1.12-%239558B2.svg)](https://julialang.org/)
 
-A research code for studying **discrete time-reversibility in the compressible Euler equations**.
+**ERT3D is a 3D compressible Euler solver written in Julia for studying numerical time reversibility and the effects of spatial and temporal discretization.**
 
-ERT3D investigates how spatial discretization and temporal integration influence the preservation of reversibility in numerical simulations. The primary benchmark is the **three-dimensional inviscid Taylor–Green vortex**.
+The project was developed from scratch as a way to study the numerical methods behind compressible CFD while also learning how to structure and optimize a scientific computing code.
 
-The code is designed around two independent numerical components:
+The main benchmark is the **three-dimensional inviscid Taylor–Green vortex**, evolved forward in time, reversed by changing the sign of the velocity field, and then integrated backward. In the continuous Euler equations, this process should recover the initial condition. The deviation from the initial state provides a measure of the numerical reversibility error.
 
-- **Spatial discretization:** conservative and split-form representations of the convective terms, combined with configurable derivative operators.
-- **Time integration:** explicit and symmetric/implicit time-integration schemes.
-
-The main objective is to quantify how these choices affect conservation, accuracy, stability, and ultimately the error accumulated when a simulation is integrated forward and then backward in time.
-
-> **Status:** Early development. The core spatial discretization, state representation, derivative operators, and initial time-integration components are currently being developed and validated.
+The benchmark follows the approach of Duponcheel, Orlandi & Winckelmans and was also inspired by a CFD ParSchool lecture by Prof. Sergio Pirozzoli.
 
 ---
 
 ## Overview
 
-For the compressible Euler equations,
+The compressible Euler equations can be written as
 
-\[
-\frac{\partial Q}{\partial t} + \nabla \cdot F(Q) = 0,
-\]
+$$
+\frac{\partial Q}{\partial t} + \nabla \cdot F(Q) = 0.
+$$
 
-a continuous solution is formally time-reversible under
+Under time reversal,
 
-\[
+$$
 t \rightarrow -t,
 \qquad
-\mathbf{u} \rightarrow -\mathbf{u}.
-\]
+\mathbf{u} \rightarrow -\mathbf{u},
+$$
 
-A discrete numerical method does not necessarily preserve this property.
+the continuous equations are formally reversible.
 
-ERT3D provides a controlled framework for studying the resulting **reversibility error** and its dependence on:
+A discrete numerical method does not necessarily preserve this property. ERT3D provides a controlled framework for investigating how numerical choices affect the resulting reversibility error.
 
-- spatial derivative order,
-- flux formulation,
-- split-form representation,
-- temporal integration scheme,
-- spatial resolution,
-- timestep size.
+The current framework allows the spatial and temporal discretizations to be changed independently.
 
-The Taylor–Green vortex provides the primary test problem because it generates increasingly complex three-dimensional flow structures while remaining well suited to controlled numerical experiments.
+```text
+                         ERT3D
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+      Spatial discretization     Time integration
+              │                         │
+       DerivativeOperator          TimeIntegrator
+              │                         │
+        Convective scheme               │
+              │                         │
+              └────────────┬────────────┘
+                           │
+                         State
+                           │
+                    Euler equations
+````
 
 ---
 
@@ -53,59 +59,170 @@ The Taylor–Green vortex provides the primary test problem because it generates
 
 ### Spatial discretization
 
-The current spatial discretization framework supports:
+ERT3D currently includes central finite-difference derivative operators of:
 
-- Central finite-difference derivative operators
-- Fourth-, sixth-, and eighth-order central differences
-- Direct conservative formulation
-- Feiereisen split form
-- Kennedy–Gruber split form
+* 4th order
+* 6th order
+* 8th order
 
-The formulation is designed so that additional spatial schemes can be introduced without modifying the existing solver infrastructure.
+The convective terms can be evaluated using:
+
+* **Direct formulation** — direct application of the derivative operators to the governing equations.
+* **Feiereisen split form (FR-SF)**
+* **Kennedy–Gruber split form (KG-SF)**
+
+The spatial formulation is separated from the derivative operator so that different numerical choices can be tested without changing the rest of the solver.
 
 ### Time integration
 
-The current time-integration framework includes:
+The current production simulations use the **third-order Shu–Osher Runge–Kutta scheme (RK3)**.
 
-- Shu–Osher third-order explicit Runge–Kutta
-- Classical fourth-order explicit Runge–Kutta
-- Implicit midpoint
-- Two-stage fourth-order Gauss–Legendre Runge–Kutta
-
-Explicit methods are being implemented first, followed by symmetric implicit methods relevant to reversibility studies.
+A **self-adjoint implicit midpoint integrator** is planned as a further test of time reversibility.
 
 ---
 
-## Design
+# Results
 
-The code separates the main numerical concerns into independent abstractions:
+## 1. Derivative verification
+
+The finite-difference derivative operators are first verified using manufactured solutions.
+
+The observed convergence rates agree with the corresponding theoretical orders for the 4th-, 6th- and 8th-order central schemes.
+
+See:
 
 ```text
-                    ERT3D
-                      │
-          ┌───────────┴───────────┐
-          │                       │
-   Spatial discretization     Time integration
-          │                       │
-    DerivativeOperator       TimeIntegrator
-          │                       │
-      FluxScheme                step!
-          │                       │
-          └───────────┬───────────┘
-                      │
-                    State
-                      │
-              Euler semi-discrete
-                  equations
-````
-
-Adding a new derivative operator, flux formulation, or time integrator should require implementing the corresponding interface rather than modifying the rest of the solver.
-
-The detailed design rationale is documented in [`docs/design.md`](docs/design.md).
+figures/derivative_convergence.png
+```
 
 ---
 
-## Project structure
+## 2. Synthetic turbulence initial condition
+
+ERT3D includes a synthetic isotropic turbulence initial condition used for the compressible turbulence benchmark.
+
+The initialization is checked for:
+
+* zero mean velocity
+* prescribed RMS velocity
+* divergence-free velocity field
+* thermodynamic consistency
+* target energy spectrum
+
+An example of the generated initial field is shown below.
+
+![Synthetic turbulence initial condition](data/processed/st_initialcondition.png)
+
+---
+
+## 3. Pirozzoli compressible turbulence benchmark
+
+The compressible solver was tested using the unforced isotropic turbulence case presented by **Pirozzoli (2010)**.
+
+The comparison is particularly useful because both calculations use the **Kennedy–Gruber split form**, but discretize it differently.
+
+ERT3D uses the **direct D-KG-SF formulation**, where standard central-difference operators are applied directly to the split terms.
+
+Pirozzoli's reference calculation uses the **locally conservative C-KG-SF formulation**, in which the split derivatives are recast in terms of numerical fluxes.
+
+The comparison therefore tests whether the simpler direct discretization reproduces the main behaviour of the published reference calculation.
+
+The resulting kinetic-energy and density-fluctuation histories show **qualitative agreement with the reference results**, while also revealing differences between the two formulations.
+
+![Pirozzoli benchmark comparison](data/processed/pirozzoli_orders_comparison.png)
+
+Reference:
+
+> Pirozzoli, S.
+> *Generalized conservative approximations of split convective derivative operators.*
+> Journal of Computational Physics, 229 (2010), 7180–7190.
+
+---
+
+## 4. Euler time-reversibility benchmark
+
+The main experiment follows the forward/backward Taylor–Green vortex procedure:
+
+```text
+Initial Taylor–Green vortex
+            │
+            ▼
+    Forward integration
+            │
+            ▼
+   Small-scale structures
+            │
+            ▼
+       Reverse velocity
+            │
+            ▼
+   Backward integration
+            │
+            ▼
+    Reconstructed state
+            │
+            ▼
+     Reversibility error
+```
+
+The reconstruction error is measured between the final state and the original initial condition.
+
+For the current reversibility studies, ERT3D uses:
+
+* $32^3$ grid
+* 6th-order central differences
+* Kennedy–Gruber split form
+* third-order Runge–Kutta time integration
+
+### Time-step dependence
+
+The reconstruction error follows approximately
+
+$$
+\epsilon \propto \Delta t^3,
+$$
+
+with a fitted slope of approximately **2.98**, consistent with the third-order RK scheme.
+
+### Dependence on reversal time
+
+The reconstruction error grows approximately **linearly with the reversal time** up to
+
+$$
+T_{\mathrm{rev}} \approx 32,
+$$
+
+after which the growth becomes faster.
+
+![Reversibility studies](data/processed/reversibility_studies.png)
+
+These results are consistent with the conclusions of Duponcheel, Orlandi & Winckelmans that the accuracy of the time-stepping scheme is a key factor in numerical time reversibility.
+
+A visualization of the complete forward → breakdown → reversal → reconstruction process is available in:
+
+```text
+data/processed/reversibility/
+```
+
+---
+
+# Performance
+
+A substantial part of the implementation work focused on the efficiency of the serial solver.
+
+This included:
+
+* profiling numerical kernels
+* reducing unnecessary allocations
+* reusing solver workspace
+* separating numerical components to simplify benchmarking
+* comparing the computational cost of different spatial formulations
+
+ERT3D is currently a **serial CPU implementation**. Parallel execution through MPI, OpenMP or GPU frameworks is outside the current scope.
+
+---
+
+# Project structure
 
 ```text
 src/
@@ -113,126 +230,165 @@ src/
 ├── parameters.jl                # Physical and numerical parameters
 ├── grid.jl                      # Computational grid
 ├── state.jl                     # Conserved and primitive states
-├── physics.jl                   # Euler-variable conversions and physics
+├── physics.jl                   # Euler physics and variable conversions
 ├── workspace.jl                 # Reusable solver workspaces
+├── simulation.jl                # Simulation orchestration
+├── experiment.jl                # Experiment configuration
+├── metrics.jl                   # Diagnostics and error metrics
+├── io.jl                        # JLD2 / VTK output
+│
 ├── derivatives/
-│   ├── abstract.jl              # Derivative operator interface
+│   ├── abstract.jl              # Derivative interface
 │   └── central.jl               # Central finite differences
+│
 ├── schemes/
-│   ├── abstract.jl              # Flux scheme interface
-│   ├── Direct.jl                # Direct conservative formulation
+│   ├── abstract.jl              # Convective-scheme interface
+│   ├── Direct.jl                # Direct formulation
 │   ├── Feiereisen.jl            # Feiereisen split form
 │   └── KennedyGruber.jl         # Kennedy–Gruber split form
+│
 ├── integrators/
 │   ├── abstract.jl              # Time-integrator interface
-│   ├── explicit_rk3.jl          # Shu–Osher RK3
-│   ├── explicit_rk4.jl          # Classical RK4
-│   └── implicit_midpoint.jl     # Implicit midpoint
-├── initial_conditions/
-│   ├── taylor_green.jl          # Taylor–Green vortex
-│   └── synthetic_turbulence.jl  # Synthetic turbulence test case
-├── experiment.jl                # Experiment orchestration
-├── metrics.jl                   # Error and diagnostic metrics
-└── io.jl                        # Output and data handling
+│   └── explicit_rk3.jl          # Shu–Osher RK3
+│
+└── initial_conditions/
+    ├── abstract.jl              # Initial-condition interface
+    ├── taylor_green.jl          # Taylor–Green vortex
+    └── synthetic_turbulence.jl  # Synthetic turbulence
 
 test/
 ├── derivatives/
-├── schemes/
+├── initialization/
 ├── integrators/
-└── ...
+└── scheme/
+
+data/
+├── raw/                         # Simulation output
+├── processed/                   # Figures and visualizations
+└── reference/                   # Reference / digitized data
 
 docs/
-└── design.md                    # Design and implementation rationale
+└── design.md                   # Design and implementation notes
 
-scripts/                         # Reproducible simulations and parameter sweeps
+scripts/                         # Reproducible simulations and plotting
 ```
 
 ---
 
-## Development
+# Running a simulation
 
-The project is currently under active development. Numerical components are being validated independently before being combined into complete simulation workflows.
-
-Current validation includes:
-
-* manufactured derivative convergence tests,
-* discrete skew-symmetry of centered derivatives,
-* constant-state preservation,
-* global conservation,
-* spatial convergence of split-form operators,
-* reusable workspace and state-operation tests,
-* Runge–Kutta stage and timestep validation.
-
-The next stage is to expose these components through a high-level simulation interface and run complete Taylor–Green vortex simulations.
-
----
-
-## Planned workflow
-
-The intended user-facing interface is:
+A typical simulation is assembled by selecting the grid, physical parameters, derivative operator, convective scheme and time integrator.
 
 ```julia
 using ERT3D
 
-sim = Simulation(
-    grid,
-    params;
-    derivative = Central8(grid),
-    scheme = KennedyGruber(),
-    integrator = ExplicitRK3(),
+N = 64
+
+grid = Grid(N)
+
+params = Parameters(
+    gamma = 1.4,
+    Mt0 = 0.07,
+    k0 = 6.0
 )
 
-initialize!(sim, TaylorGreen())
+derivative = Central6(grid)
+scheme     = KennedyGruber()
+integrator = ExplicitRK3()
 
-run!(sim, Tfinal, dt)
+state = State(grid)
+initialize!(state, TaylorGreen(), grid, params)
+
+workspace = RK3Workspace(grid)
+
+sim = Simulation(
+    state = state,
+    grid = grid,
+    params = params,
+    derivative = derivative,
+    scheme = scheme,
+    integrator = integrator,
+    workspace = workspace,
+)
+
+run!(sim, 8.0; dt = 0.025, verbose = true)
 ```
 
-This interface is **planned and will evolve during development**.
+The complete benchmark configurations and plotting utilities are available in [`scripts/`](scripts/).
 
 ---
 
-## Reversibility benchmark
+# Reversibility benchmark
 
-The central experiment will follow the sequence:
+The reversibility experiment consists of:
+
+1. Initializing the Taylor–Green vortex.
+2. Integrating the Euler equations forward to a prescribed reversal time.
+3. Reversing the velocity field.
+4. Continuing the integration for the same amount of time.
+5. Comparing the final state with the original initial condition.
+
+The reversibility error is evaluated over the conserved variables
+
+$$
+Q =
+\left(
+\rho,\,
+\rho u,\,
+\rho v,\,
+\rho w,\,
+\rho E
+\right).
+$$
+
+This provides a common basis for comparing different spatial and temporal discretizations.
+
+---
+
+# Reproducibility
+
+Simulation data, processed results and reference data are kept separately:
 
 ```text
-Initial condition
-       │
-       ▼
- Forward integration
-       │
-       ▼
-   State at T
-       │
-       ▼
- Backward integration
-       │
-       ▼
-   State at 0
-       │
-       ▼
- Reversibility error
+data/
+├── raw/
+├── processed/
+└── reference/
 ```
 
-The accumulated error is measured relative to the original initial condition.
-
-This makes it possible to compare spatial and temporal discretizations on the same physical problem while isolating the contribution of each numerical choice.
+The figures in this README are generated from ERT3D simulation data. Reference data are included separately where published results are used for comparison.
 
 ---
 
-## References
+# References
 
-Pirozzoli, S.
-“Generalized conservative approximations of split convective derivative operators.”
+### Pirozzoli (2010)
+
+S. Pirozzoli,
+**Generalized conservative approximations of split convective derivative operators**,
 *Journal of Computational Physics*, 229 (2010), 7180–7190.
 
-Brachet, M. E., et al.
-“Small-scale structure of the Taylor–Green vortex.”
-*Journal of Fluid Mechanics*, 130 (1983), 411–452.
+### Duponcheel, Orlandi & Winckelmans (2008)
 
-Duponcheel, M., Orlandi, P., Winckelmans, G.
-“Time-reversibility of the Euler equations as a benchmark for energy conserving schemes.”
+M. Duponcheel, P. Orlandi, G. Winckelmans,
+**Time-reversibility of the Euler equations as a benchmark for energy conserving schemes**,
 *Journal of Computational Physics*, 227 (2008), 8736–8752.
 
-```
-```
+### Brachet et al. (1983)
+
+M. E. Brachet et al.,
+**Small-scale structure of the Taylor–Green vortex**,
+*Journal of Fluid Mechanics*, 130 (1983), 411–452.
+
+### Honein & Moin (2004)
+
+A. E. Honein, P. Moin,
+**Higher entropy conservation and numerical stability of compressible turbulence simulations**,
+*Journal of Computational Physics*, 201 (2004), 531–545.
+
+---
+
+# License
+
+MIT — see [`LICENSE`](LICENSE).
+
