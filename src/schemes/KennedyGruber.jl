@@ -61,16 +61,16 @@ The `workspace` provides reusable storage for primitive variables
 and temporary arrays.
 """
 function KennedyGruber!(
-    out::Array{Float64,3},
-    rho::Array{Float64,3},
-    u::Array{Float64,3},
-    v::Array{Float64,3},
-    w::Array{Float64,3},
-    phi::Array{Float64,3},
+    out::Array{T,3},
+    rho::Array{T,3},
+    u::Array{T,3},
+    v::Array{T,3},
+    w::Array{T,3},
+    phi::Array{T,3},
     D::DerivativeOperator,
     grid::Grid,
     workspace::SpatialWorkspace,
-)
+) where {T<:AbstractFloat}
 
     tmp  = workspace.tmp
     flux = workspace.flux
@@ -81,28 +81,28 @@ function KennedyGruber!(
 
     @. flux = rho * u * phi
     derivative_x!(tmp, flux, D, grid)
-    @. out = 0.25 * tmp
+    @. out = T(0.25) * tmp
 
     @. flux = rho * phi
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.25 * u * tmp
+    @. out += T(0.25) * u * tmp
 
     @. flux = u * phi
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.25 * rho * tmp
+    @. out += T(0.25) * rho * tmp
 
     @. flux = rho * u
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.25 * phi * tmp
+    @. out += T(0.25) * phi * tmp
 
     derivative_x!(tmp, phi, D, grid)
-    @. out += 0.25 * rho * u * tmp
+    @. out += T(0.25) * rho * u * tmp
 
     derivative_x!(tmp, u, D, grid)
-    @. out += 0.25 * rho * phi * tmp
+    @. out += T(0.25) * rho * phi * tmp
 
     derivative_x!(tmp, rho, D, grid)
-    @. out += 0.25 * u * phi * tmp
+    @. out += T(0.25) * u * phi * tmp
 
 
     # ============================================================
@@ -111,28 +111,28 @@ function KennedyGruber!(
 
     @. flux = rho * v * phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.25 * tmp
+    @. out += T(0.25) * tmp
 
     @. flux = rho * phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.25 * v * tmp
+    @. out += T(0.25) * v * tmp
 
     @. flux = v * phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.25 * rho * tmp
+    @. out += T(0.25) * rho * tmp
 
     @. flux = rho * v
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.25 * phi * tmp
+    @. out += T(0.25) * phi * tmp
 
     derivative_y!(tmp, phi, D, grid)
-    @. out += 0.25 * rho * v * tmp
+    @. out += T(0.25) * rho * v * tmp
 
     derivative_y!(tmp, v, D, grid)
-    @. out += 0.25 * rho * phi * tmp
+    @. out += T(0.25) * rho * phi * tmp
 
     derivative_y!(tmp, rho, D, grid)
-    @. out += 0.25 * v * phi * tmp
+    @. out += T(0.25) * v * phi * tmp
 
 
     # ============================================================
@@ -141,46 +141,46 @@ function KennedyGruber!(
 
     @. flux = rho * w * phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.25 * tmp
+    @. out += T(0.25) * tmp
 
     @. flux = rho * phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.25 * w * tmp
+    @. out += T(0.25) * w * tmp
 
     @. flux = w * phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.25 * rho * tmp
+    @. out += T(0.25) * rho * tmp
 
     @. flux = rho * w
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.25 * phi * tmp
+    @. out += T(0.25) * phi * tmp
 
     derivative_z!(tmp, phi, D, grid)
-    @. out += 0.25 * rho * w * tmp
+    @. out += T(0.25) * rho * w * tmp
 
     derivative_z!(tmp, w, D, grid)
-    @. out += 0.25 * rho * phi * tmp
+    @. out += T(0.25) * rho * phi * tmp
 
     derivative_z!(tmp, rho, D, grid)
-    @. out += 0.25 * w * phi * tmp
+    @. out += T(0.25) * w * phi * tmp
 
     return out
 end
 
 
 function KennedyGruber!(
-    out::Array{Float64,3},
-    rho::Array{Float64,3},
-    u::Array{Float64,3},
-    v::Array{Float64,3},
-    w::Array{Float64,3},
-    phi::Float64,
+    out::Array{T,3},
+    rho::Array{T,3},
+    u::Array{T,3},
+    v::Array{T,3},
+    w::Array{T,3},
+    phi::T,
     D::DerivativeOperator,
     grid::Grid,
     workspace::SpatialWorkspace,
-)
+) where {T<:AbstractFloat}
 
-    @assert phi == 1.0
+    @assert phi == one(T)
 
     tmp  = workspace.tmp
     flux = workspace.flux
@@ -191,13 +191,13 @@ function KennedyGruber!(
 
     @. flux = rho * u
     derivative_x!(tmp, flux, D, grid)
-    @. out = 0.5 * tmp
+    @. out = T(0.5) * tmp
 
     derivative_x!(tmp, rho, D, grid)
-    @. out += 0.5 * u * tmp
+    @. out += T(0.5) * u * tmp
 
     derivative_x!(tmp, u, D, grid)
-    @. out += 0.5 * rho * tmp
+    @. out += T(0.5) * rho * tmp
 
 
     # ------------------------------------------------------------
@@ -206,13 +206,13 @@ function KennedyGruber!(
 
     @. flux = rho * v
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     derivative_y!(tmp, rho, D, grid)
-    @. out += 0.5 * v * tmp
+    @. out += T(0.5) * v * tmp
 
     derivative_y!(tmp, v, D, grid)
-    @. out += 0.5 * rho * tmp
+    @. out += T(0.5) * rho * tmp
 
 
     # ------------------------------------------------------------
@@ -221,13 +221,13 @@ function KennedyGruber!(
 
     @. flux = rho * w
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     derivative_z!(tmp, rho, D, grid)
-    @. out += 0.5 * w * tmp
+    @. out += T(0.5) * w * tmp
 
     derivative_z!(tmp, w, D, grid)
-    @. out += 0.5 * rho * tmp
+    @. out += T(0.5) * rho * tmp
 
     return out
 end
@@ -284,7 +284,7 @@ function spatial_operator!(
         u,
         v,
         w,
-        1.0,
+        one(eltype(rho)),
         D,
         grid,
         workspace,

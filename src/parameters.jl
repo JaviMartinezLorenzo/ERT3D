@@ -1,10 +1,25 @@
+
 """
-Parameters
+    Parameters(; gamma, Mt0, k0=6.0, T=Float64)
 
 Container for the physical and simulation parameters.
+Defaults to Float64 precision.
 """
-Base.@kwdef struct Parameters
-    gamma::Float64
-    Mt0::Float64
-    k0::Float64 = 6.0
+struct Parameters{T<:AbstractFloat}
+    gamma::T
+    Mt0::T
+    k0::T
+end
+
+function Parameters(;
+    gamma,
+    Mt0,
+    k0=6.0,
+    T::Type{<:AbstractFloat}=Float64,
+)
+    return Parameters{T}(
+        T(gamma),
+        T(Mt0),
+        T(k0),
+    )
 end

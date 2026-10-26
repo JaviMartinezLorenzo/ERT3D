@@ -37,16 +37,16 @@ and temporary arrays, avoiding repeated allocation during spatial
 operator evaluations.
 """
 function feiereisen!(
-    out::Array{Float64,3},
-    rho::Array{Float64,3},
-    u::Array{Float64,3},
-    v::Array{Float64,3},
-    w::Array{Float64,3},
-    phi::Array{Float64,3},
+    out::Array{T,3},
+    rho::Array{T,3},
+    u::Array{T,3},
+    v::Array{T,3},
+    w::Array{T,3},
+    phi::Array{T,3},
     D::DerivativeOperator,
     grid::Grid,
     workspace::SpatialWorkspace,
-)
+) where {T<:AbstractFloat}
 
     tmp  = workspace.tmp
     flux = workspace.flux
@@ -57,15 +57,15 @@ function feiereisen!(
 
     @. flux = rho * u * phi
     derivative_x!(tmp, flux, D, grid)
-    @. out = 0.5 * tmp
+    @. out = T(0.5) * tmp
 
     @. flux = rho * u
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
     @. flux = phi
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.5 * rho * u * tmp
+    @. out += T(0.5) * rho * u * tmp
 
 
     # ------------------------------------------------------------
@@ -74,15 +74,15 @@ function feiereisen!(
 
     @. flux = rho * v * phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     @. flux = rho * v
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
     @. flux = phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * rho * v * tmp
+    @. out += T(0.5) * rho * v * tmp
 
 
     # ------------------------------------------------------------
@@ -91,33 +91,32 @@ function feiereisen!(
 
     @. flux = rho * w * phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     @. flux = rho * w
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
     @. flux = phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * rho * w * tmp
+    @. out += T(0.5) * rho * w * tmp
 
     return out
 end
 
-
 function feiereisen!(
-    out::Array{Float64,3},
-    rho::Array{Float64,3},
-    u::Array{Float64,3},
-    v::Array{Float64,3},
-    w::Array{Float64,3},
-    phi::Float64,
+    out::Array{T,3},
+    rho::Array{T,3},
+    u::Array{T,3},
+    v::Array{T,3},
+    w::Array{T,3},
+    phi::T,
     D::DerivativeOperator,
     grid::Grid,
     workspace::SpatialWorkspace,
-)
+) where {T<:AbstractFloat}
 
-    @assert phi == 1.0
+    @assert phi == one(T)
 
     tmp  = workspace.tmp
     flux = workspace.flux
@@ -128,11 +127,11 @@ function feiereisen!(
 
     @. flux = rho * u * phi
     derivative_x!(tmp, flux, D, grid)
-    @. out = 0.5 * tmp
+    @. out = T(0.5) * tmp
 
     @. flux = rho * u
     derivative_x!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
 
     # ------------------------------------------------------------
@@ -141,11 +140,11 @@ function feiereisen!(
 
     @. flux = rho * v * phi
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     @. flux = rho * v
     derivative_y!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
 
     # ------------------------------------------------------------
@@ -154,11 +153,11 @@ function feiereisen!(
 
     @. flux = rho * w * phi
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * tmp
+    @. out += T(0.5) * tmp
 
     @. flux = rho * w
     derivative_z!(tmp, flux, D, grid)
-    @. out += 0.5 * phi * tmp
+    @. out += T(0.5) * phi * tmp
 
     return out
 end
@@ -215,7 +214,7 @@ function spatial_operator!(
         u,
         v,
         w,
-        1.0,
+        one(eltype(rho)),
         D,
         grid,
         workspace,

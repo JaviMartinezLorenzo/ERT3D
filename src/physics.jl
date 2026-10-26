@@ -1,14 +1,17 @@
 """
-    primitive_variables(state::State, gamma)
+    primitive_variables(state::State{T}, params::Parameters{T})
 
 Convert a conserved state to primitive variables using the calorically
-perfect ideal-gas equation of state
+perfect ideal-gas equation of state:
 
     p = (γ - 1)ρe
 
-Returns a `PrimitiveState`.
+Returns a `PrimitiveState{T}`.
 """
-function primitive_variables(state::State, params::Parameters)
+function primitive_variables(
+    state::State{T},
+    params::Parameters{T},
+) where {T<:AbstractFloat}
 
     gamma = params.gamma
     rho = state.rho
@@ -17,23 +20,25 @@ function primitive_variables(state::State, params::Parameters)
     v = state.rhov ./ rho
     w = state.rhow ./ rho
 
-    kinetic = 0.5 .* (u.^2 .+ v.^2 .+ w.^2)
-
+    kinetic = T(0.5) .* (u.^2 .+ v.^2 .+ w.^2)
     e = state.rhoE ./ rho .- kinetic
-
-    p = (gamma - 1) .* rho .* e
+    p = (gamma - one(T)) .* rho .* e
 
     return PrimitiveState(rho, u, v, w, p)
 end
 
+
 """
-    conserved_variables(primitive::PrimitiveState, gamma)
+    conserved_variables(primitive::PrimitiveState{T}, params::Parameters{T})
 
 Convert a primitive state to conserved variables.
 
-Returns a `State`.
+Returns a `State{T}`.
 """
-function conserved_variables(primitive::PrimitiveState, params::Parameters)
+function conserved_variables(
+    primitive::PrimitiveState{T},
+    params::Parameters{T},
+) where {T<:AbstractFloat}
 
     gamma = params.gamma
     rho = primitive.rho
@@ -46,36 +51,35 @@ function conserved_variables(primitive::PrimitiveState, params::Parameters)
     rhov = rho .* v
     rhow = rho .* w
 
-    kinetic = 0.5 .* (u.^2 .+ v.^2 .+ w.^2)
-
-    rhoE = p ./ (gamma - 1) .+ rho .* kinetic
+    kinetic = T(0.5) .* (u.^2 .+ v.^2 .+ w.^2)
+    rhoE = p ./ (gamma - one(T)) .+ rho .* kinetic
 
     return State(rho, rhou, rhov, rhow, rhoE)
 end
 
-"""
-    reverse_velocity!(state)
 
-Apply the velocity-reversal operator
+"""
+    reverse_velocity!(state::State)
+
+Apply the velocity-reversal operator:
 
     u → -u
 
-used by the Euler Reversibility Test.
-
 Density and total energy remain unchanged.
 """
-function reverse_velocity!(state::State)
-    state.rhou .*= -1
-    state.rhov .*= -1
-    state.rhow .*= -1
+function reverse_velocity!(state::State{T}) where {T<:AbstractFloat}
+    state.rhou .*= -one(T)
+    state.rhov .*= -one(T)
+    state.rhow .*= -one(T)
     return state
 end
 
+
 function primitive_variables!(
-    out::PrimitiveState,
-    state::State,
-    params::Parameters,
-)
+    out::PrimitiveState{T},
+    state::State{T},
+    params::Parameters{T},
+) where {T<:AbstractFloat}
 
     gamma = params.gamma
 
@@ -90,9 +94,9 @@ function primitive_variables!(
     @. out.v   = rhov / rho
     @. out.w   = rhow / rho
 
-    @. out.p = (gamma - 1.0) * (
+    @. out.p = (gamma - one(T)) * (
         rhoE -
-        0.5 * (
+        T(0.5) * (
             rhou * out.u +
             rhov * out.v +
             rhow * out.w

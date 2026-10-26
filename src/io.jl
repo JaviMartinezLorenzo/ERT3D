@@ -9,13 +9,19 @@ using WriteVTK
 # Internal helper
 # -------------------------------------------------------------------------
 
-function build_vtk(state::State, grid::Grid, params::Parameters,
-                    D::DerivativeOperator, path::String)
+function build_vtk(
+    state::State{T},
+    grid::Grid{T},
+    params::Parameters{T},
+    D::DerivativeOperator,
+    path::String,
+) where {T<:AbstractFloat}
+
     primitive = primitive_variables(state, params)
     X, Y, Z = meshgrid(grid)
 
     vtk = vtk_grid(path, X, Y, Z)
-    vtk["density"]  = primitive.rho
+    vtk["density"] = primitive.rho
     vtk["pressure"] = primitive.p
     vtk["velocity"] = (primitive.u, primitive.v, primitive.w)
     vtk["velocity magnitude"] = sqrt.(primitive.u.^2 .+ primitive.v.^2 .+ primitive.w.^2)
@@ -24,16 +30,24 @@ function build_vtk(state::State, grid::Grid, params::Parameters,
     return vtk
 end
 
+
 # -------------------------------------------------------------------------
 # Export a single snapshot
 # -------------------------------------------------------------------------
 
-function export_vtk(state::State, grid::Grid, params::Parameters,
-                     D::DerivativeOperator, path::String)
+function export_vtk(
+    state::State{T},
+    grid::Grid{T},
+    params::Parameters{T},
+    D::DerivativeOperator,
+    path::String,
+) where {T<:AbstractFloat}
+
     vtk = build_vtk(state, grid, params, D, path)
     vtk_save(vtk)
     return nothing
 end
+
 
 # -------------------------------------------------------------------------
 # Time series (.pvd)
@@ -49,13 +63,22 @@ function VTKCollection(basepath::String)
     return VTKCollection(paraview_collection(basepath), basepath, 0)
 end
 
-function add_snapshot!(collection::VTKCollection, state::State, grid::Grid,
-                        params::Parameters, D::DerivativeOperator, time::Float64)
+function add_snapshot!(
+    collection::VTKCollection,
+    state::State{T},
+    grid::Grid{T},
+    params::Parameters{T},
+    D::DerivativeOperator,
+    time::Float64,
+) where {T<:AbstractFloat}
+
     collection.counter += 1
     filename = "$(collection.basepath)_$(collection.counter)"
+
     vtk = build_vtk(state, grid, params, D, filename)
     collection.pvd[time] = vtk
     vtk_save(vtk)
+
     return nothing
 end
 
@@ -63,6 +86,7 @@ function close_collection!(collection::VTKCollection)
     vtk_save(collection.pvd)
     return nothing
 end
+
 
 # -------------------------------------------------------------------------
 # Simulation Diagnostics
@@ -73,14 +97,8 @@ end
 
 Stores scalar time histories generated during a simulation.
 
-The diagnostics include:
-
-- `kinetic_energy`: total kinetic energy.
-- `density_rms`: RMS density fluctuation.
-- `total_mass`: total mass.
-- `total_momentum_x/y/z`: total momentum components.
-- `total_energy`: total energy.
-- `max_local_mach`: maximum local Mach number.
+All diagnostic histories use Float64, independently of the simulation
+precision.
 """
 mutable struct Diagnostics
     t::Vector{Float64}
@@ -110,19 +128,13 @@ Diagnostics() = Diagnostics(
 """
     record!(diag, sim)
 
-Compute and store scalar diagnostics for the current simulation state.
-
-All quantities are evaluated in a single grid traversal to avoid creating
-temporary three-dimensional arrays.
+Compute and store scalar diagnostics for the current simulation state,
+using Float64 arithmetic.
 """
-function record!(
-    diag::Diagnostics,
-    sim::Simulation,
-)
-
+function record!(diag::Diagnostics, sim::Simulation)
     state = sim.state
-    gamma = sim.params.gamma
-    dV = sim.grid.dx^3
+    gamma = Float64(sim.params.gamma)
+    dV = Float64(sim.grid.dx)^3
 
     mass = 0.0
     momentum_x = 0.0
@@ -134,52 +146,47 @@ function record!(
     density_squared_sum = 0.0
     max_mach = 0.0
 
-    @inbounds for k in axes(state.rho, 3)
-        for j in axes(state.rho, 2)
-            for i in axes(state.rho, 1)
+    @inbounds for i in eachindex(state.rho)
+        rho = Float64(state.rho[i])
+        rhou = Float64(state.rhou[i])
+        rhov = Float64(state.rhov[i])
+        rhow = Float64(state.rhow[i])
+        rhoE = Float64(state.rhoE[i])
 
-                rho  = state.rho[i, j, k]
-                rhou = state.rhou[i, j, k]
-                rhov = state.rhov[i, j, k]
-                rhow = state.rhow[i, j, k]
-                rhoE = state.rhoE[i, j, k]
+        u = rhou / rho
+        v = rhov / rho
+        w = rhow / rho
 
-                u = rhou / rho
-                v = rhov / rho
-                w = rhow / rho
+        velocity_squared = u^2 + v^2 + w^2
 
-                velocity_squared = u^2 + v^2 + w^2
+        pressure = (gamma - 1.0) * (
+            rhoE - 0.5 * rho * velocity_squared
+        )
 
-                pressure = (gamma - 1.0) * (
-                    rhoE -
-                    0.5 * rho * velocity_squared
-                )
+        sound_speed = sqrt(gamma * pressure / rho)
+        mach = sqrt(velocity_squared) / sound_speed
 
-                sound_speed = sqrt(gamma * pressure / rho)
+        mass += rho
+        momentum_x += rhou
+        momentum_y += rhov
+        momentum_z += rhow
+        energy += rhoE
+        kinetic += 0.5 * rho * velocity_squared
 
-                mach = sqrt(velocity_squared) / sound_speed
+        density_sum += rho
+        density_squared_sum += rho^2
 
-                mass += rho
-                momentum_x += rhou
-                momentum_y += rhov
-                momentum_z += rhow
-                energy += rhoE
-                kinetic += 0.5 * rho * velocity_squared
-
-                density_sum += rho
-                density_squared_sum += rho^2
-
-                max_mach = max(max_mach, mach)
-            end
-        end
+        max_mach = max(max_mach, mach)
     end
 
     n_cells = length(state.rho)
     mean_density = density_sum / n_cells
+    rho_rms = sqrt(max(
+        0.0,
+        density_squared_sum / n_cells - mean_density^2,
+    ))
 
-    rho_rms = sqrt(max(0.0, density_squared_sum / n_cells - mean_density^2))
-
-    push!(diag.t, sim.t)
+    push!(diag.t, Float64(sim.t))
     push!(diag.kinetic_energy, kinetic * dV)
     push!(diag.density_rms, rho_rms)
     push!(diag.total_mass, mass * dV)
@@ -198,10 +205,7 @@ end
 
 Save diagnostic histories to a JLD2 file.
 """
-function save_diagnostics(
-    diag::Diagnostics,
-    path::String,
-)
+function save_diagnostics(diag::Diagnostics, path::String)
     jldsave(
         path;
         t = diag.t,
@@ -224,55 +228,61 @@ end
 
 Load diagnostic histories from a JLD2 file.
 """
-function load_diagnostics(
-    path::String,
-)
+function load_diagnostics(path::String)
     d = load(path)
 
     return Diagnostics(
-        d["t"],
-        d["kinetic_energy"],
-        d["density_rms"],
-        d["total_mass"],
-        d["total_momentum_x"],
-        d["total_momentum_y"],
-        d["total_momentum_z"],
-        d["total_energy"],
-        d["max_local_mach"],
+        Float64.(d["t"]),
+        Float64.(d["kinetic_energy"]),
+        Float64.(d["density_rms"]),
+        Float64.(d["total_mass"]),
+        Float64.(d["total_momentum_x"]),
+        Float64.(d["total_momentum_y"]),
+        Float64.(d["total_momentum_z"]),
+        Float64.(d["total_energy"]),
+        Float64.(d["max_local_mach"]),
     )
 end
+
+
 # -------------------------------------------------------------------------
 # Simulation checkpoint
 # -------------------------------------------------------------------------
 
-
-
 """
     save_checkpoint(sim::Simulation, path::String)
 
-Full-state checkpoint for crash recovery. Unlike VTK export, this must
-be exact/lossless — stores conserved variables directly (not primitives),
-plus current simulation time, so a run can resume exactly where it left off.
+Save conserved variables and simulation time for restarting a run.
 """
 function save_checkpoint(sim::Simulation, path::String)
-    jldsave(path;
-        rho=sim.state.rho, rhou=sim.state.rhou, rhov=sim.state.rhov,
-        rhow=sim.state.rhow, rhoE=sim.state.rhoE, t=sim.t)
+    jldsave(
+        path;
+        rho = sim.state.rho,
+        rhou = sim.state.rhou,
+        rhov = sim.state.rhov,
+        rhow = sim.state.rhow,
+        rhoE = sim.state.rhoE,
+        t = Float64(sim.t),
+    )
+
     return nothing
 end
+
 
 """
     load_checkpoint!(sim::Simulation, path::String)
 
-Restore state and time from a checkpoint, in place.
+Restore state and time from a checkpoint in place.
 """
 function load_checkpoint!(sim::Simulation, path::String)
     d = load(path)
+
     sim.state.rho  .= d["rho"]
     sim.state.rhou .= d["rhou"]
     sim.state.rhov .= d["rhov"]
     sim.state.rhow .= d["rhow"]
     sim.state.rhoE .= d["rhoE"]
-    sim.t = d["t"]
+    sim.t = Float64(d["t"])
+
     return sim
 end

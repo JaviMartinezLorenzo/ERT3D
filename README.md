@@ -103,9 +103,10 @@ The spatial formulation is separated from the derivative operator so that differ
 
 ### Time integration
 
-The current production simulations use the **third-order Shu–Osher Runge–Kutta scheme (RK3)**.
+ERT3D currently includes two time integrators:
 
-A **self-adjoint implicit midpoint integrator** is planned as a further test of time reversibility.
+* **Third-order Shu–Osher Runge–Kutta scheme (RK3)**, in three algebraically equivalent forms: the standard Shu–Osher update, an **increment form**, and an increment form with **Kahan compensated summation**. The last two were added to study single-precision behaviour (see Results, section 5).
+* **Implicit midpoint**, a self-adjoint scheme implemented as a further test of time reversibility.
 
 ---
 
@@ -159,6 +160,17 @@ The resulting kinetic-energy and density-fluctuation histories show **qualitativ
 
 ![Pirozzoli benchmark comparison](data/processed/pirozzoli_orders_comparison.png)
 
+The same case was then repeated with the 6th-order spatial discretization and both time integrators, RK3 and implicit midpoint, so that the only difference between the two ERT3D curves is the time integration.
+
+![Pirozzoli benchmark, RK3 and implicit midpoint](data/processed/pirozzoli_C6_IM_comp.png)
+
+Both integrators reproduce the reference trends qualitatively, but they behave differently:
+
+* In the density fluctuation, implicit midpoint stays close to the reference, while RK3 falls below it as time goes on.
+* In the kinetic energy, RK3 stays constant, while implicit midpoint drifts slightly downward towards the end of the run.
+
+I do not have a complete explanation for this yet, and the comparison is limited to a single $32^3$ simulation. Note also that the reference uses the C-KG-SF formulation and ERT3D the direct one, so the agreement with the reference should not be read as a ranking of the integrators.
+
 Reference:
 
 > Pirozzoli, S.
@@ -200,11 +212,11 @@ For the current reversibility studies, ERT3D uses:
 * $32^3$ grid
 * 6th-order central differences
 * Kennedy–Gruber split form
-* third-order Runge–Kutta time integration
+* third-order Runge–Kutta and implicit midpoint time integration
 
 ### Time-step dependence
 
-The reconstruction error follows approximately
+For RK3, the reconstruction error follows approximately
 
 $$
 \epsilon \propto \Delta t^3,
@@ -214,7 +226,7 @@ with a fitted slope of approximately **2.98**, consistent with the third-order R
 
 ### Dependence on reversal time
 
-The reconstruction error grows approximately **linearly with the reversal time** up to
+For RK3, the reconstruction error grows approximately **linearly with the reversal time** up to
 
 $$
 T_{\mathrm{rev}} \approx 32,
@@ -222,15 +234,68 @@ $$
 
 after which the growth becomes faster.
 
+### Implicit midpoint
+
+Since the time integrator turned out to be the main factor limiting the reconstruction accuracy, the same studies were repeated with the implicit midpoint method, whose time-symmetric nature makes it a natural candidate for a forward-and-backward test.
+
+* The reconstruction error stays close to machine precision across all the timesteps tested, and does not show the $\Delta t^3$ trend of RK3.
+* It also stays several orders of magnitude below RK3 over the whole range of reversal times tested.
+* At $\Delta t = 0.025$ and $T_{\mathrm{rev}} = 8$, the reconstruction error is approximately $2.9 \times 10^{7}$ times smaller than that of RK3.
+
 ![Reversibility studies](data/processed/reversibility_studies.png)
 
 These results are consistent with the conclusions of Duponcheel, Orlandi & Winckelmans that the accuracy of the time-stepping scheme is a key factor in numerical time reversibility.
+
+The trade-off is computational cost, discussed in the Performance section below.
 
 A visualization of the complete forward → breakdown → reversal → reconstruction process is available in:
 
 ```text
 data/processed/reversibility/
 ```
+
+---
+
+## 5. Single precision and RK3 convergence
+
+As a first step towards reduced-precision simulations, ERT3D was run in single precision throughout the solver, keeping the timestep in double precision. The goal was to get the solver working in single precision and to understand its numerical consequences, not to build an optimized mixed-precision architecture.
+
+The temporal error is estimated from the difference between solutions obtained with successive timesteps, and the observed order from the ratio of consecutive errors.
+
+With the standard Shu–Osher RK3 update, rounding errors get in the way of the expected convergence. Two modifications were tested:
+
+* **Increment form:** the update is written in terms of increments instead of full states.
+* **Increment form with Kahan compensated summation:** the accumulation of the increments is also compensated.
+
+In double precision, the three formulations give the same observed order and differ only at the level of $10^{-14}$ in relative $L^2$ norm.
+
+### $16^3$ grid
+
+Observed order, $t_{\mathrm{end}} = 10$, timesteps $\Delta t = 0.125, 0.0625, 0.03125$:
+
+| Formulation | Float32 | Float64 |
+|---|---|---|
+| Shu–Osher | 1.50 | 2.89 |
+| Increment | 2.85 | 2.89 |
+| Increment + Kahan | 2.89 | 2.89 |
+
+On this grid, the increment and Kahan formulations recover the double-precision behaviour for the timesteps tested.
+
+### $32^3$ grid
+
+Central6 and Kennedy–Gruber, $t_{\mathrm{end}} = 10$, timesteps from $\Delta t = 0.0625$ down to $0.0078125$ (Float32):
+
+| Formulation | Temporal error at the finest timestep | Fitted order |
+|---|---|---|
+| Shu–Osher | $2.5 \times 10^{-5}$ | -1.08 |
+| Increment | $1.0 \times 10^{-6}$ | -0.08 |
+| Increment + Kahan | $1.6 \times 10^{-7}$ | 1.18 |
+
+On the larger grid the third order is **not** recovered. The increment and Kahan formulations reduce the error at the finest timestep by roughly a factor of 25 and 150 respectively, but the error still stops decreasing as the timestep is reduced.
+
+The relative $L^2$ difference between the increment formulations and the standard update roughly doubles every time the timestep is halved, that is, it grows in proportion to the number of steps. This is consistent with rounding errors accumulating over the run.
+
+This suggests that the update is not the only place where rounding errors matter. The contribution of the other parts of the calculation, such as the evaluation of the spatial operators, has not been isolated yet. Choosing the precision separately for the solution, the spatial operators and the accumulation is the natural next step.
 
 ---
 
@@ -245,6 +310,19 @@ This included:
 * reusing solver workspace
 * separating numerical components to simplify benchmarking
 * comparing the computational cost of different spatial formulations
+
+### Cost of the time integrators
+
+The cost of the integrators was measured over 20 trials, integrating to $t = 0.2$ at three timesteps. The table shows the median wall-clock time in seconds, in Float64, from `data/processed/benchmark_integrators.csv`:
+
+| $\Delta t$ | Steps | RK3 (Shu–Osher) | RK3 increment | RK3 increment + Kahan | Implicit midpoint |
+|---|---|---|---|---|---|
+| 0.025 | 8 | 0.20 | 0.20 | 0.21 | 0.63 |
+| 0.005 | 40 | 1.08 | 1.08 | 1.07 | 2.27 |
+| 0.001 | 200 | 5.12 | 5.41 | 5.32 | 7.36 |
+
+* The increment and Kahan formulations add little to the cost of RK3.
+* Depending on the timestep, an implicit midpoint step takes roughly 1.4 to 3 times as long as an RK3 step. The ratio decreases as the timestep gets smaller.
 
 ERT3D is currently a **serial CPU implementation**. Parallel execution through MPI, OpenMP or GPU frameworks is outside the current scope.
 
@@ -277,7 +355,8 @@ src/
 │
 ├── integrators/
 │   ├── abstract.jl              # Time-integrator interface
-│   └── explicit_rk3.jl          # Shu–Osher RK3
+│   ├── explicit_rk3.jl          # Shu–Osher RK3 (standard, increment, Kahan)
+│   └── implicit_midpoint.jl     # Implicit midpoint
 │
 └── initial_conditions/
     ├── abstract.jl              # Initial-condition interface
@@ -417,4 +496,3 @@ A. E. Honein, P. Moin,
 # License
 
 MIT — see [`LICENSE`](LICENSE).
-
