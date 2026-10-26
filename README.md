@@ -242,7 +242,7 @@ Since the time integrator turned out to be the main factor limiting the reconstr
 * It also stays several orders of magnitude below RK3 over the whole range of reversal times tested.
 * At $\Delta t = 0.025$ and $T_{\mathrm{rev}} = 8$, the reconstruction error is approximately $2.9 \times 10^{7}$ times smaller than that of RK3.
 
-![Reversibility studies](data/processed/reversibility_studies.png)
+![Reversibility studies](data/processed/reversibility_studies_full.png)
 
 These results are consistent with the conclusions of Duponcheel, Orlandi & Winckelmans that the accuracy of the time-stepping scheme is a key factor in numerical time reversibility.
 
