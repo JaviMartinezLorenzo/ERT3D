@@ -5,8 +5,8 @@ using ERT3D
 # ============================================================
 
 N = 32
-dt_target = 0.025
-t_rev = 0.05
+dt_target =  0.06
+t_rev = 8
 
 dt = compatible_dt(t_rev, dt_target)
 nsteps = round(Int, t_rev / dt)
@@ -20,18 +20,18 @@ params = Parameters(
 
 derivative = Central6(grid)
 scheme = KennedyGruber()
-integrator = ExplicitRK3()
+integrator = ImplicitMidpoint()
 
 state = State(grid)
 
 initialize!(
     state,
-    SyntheticTurbulence(),
+    TaylorGreen(),
     grid,
     params,
 )
-
-coll = VTKCollection("data/processed/initial_condition")
+#=
+coll = VTKCollection("data/raw/initial_condition")
 
 add_snapshot!(
     coll,
@@ -43,8 +43,9 @@ add_snapshot!(
 )
 
 close_collection!(coll)
+=#
 
-workspace = RK3Workspace(grid)
+workspace = ImplicitMidpointWorkspace(grid)
 
 sim = Simulation(
     state = state,
@@ -174,7 +175,7 @@ error = l2_reconstruction_error(s0, sim.state)
 
 save_diagnostics(
     diagnostics,
-    "data/raw/reversibility/diagnostics.jld2",
+    "data/raw/IM/diagnostics.jld2",
 )
 
 println()

@@ -49,8 +49,8 @@ params = Parameters(
 # Pirozzoli's C-KG-SF:
 
 derivative = Central6(grid)
-scheme = Feiereisen()
-integrator = ExplicitRK3()
+scheme = KennedyGruber()
+integrator = ImplicitMidpoint()
 
 # ------------------------------------------------------------
 # Initial condition
@@ -69,7 +69,7 @@ initialize!(
 # Simulation
 # ------------------------------------------------------------
 
-workspace = RK3Workspace(grid)
+workspace = ImplicitMidpointWorkspace(grid)
 
 sim = Simulation(
     state      = state,
@@ -118,11 +118,11 @@ run!(
 # ------------------------------------------------------------
 # Save results
 # ------------------------------------------------------------
-mkpath("data/raw/C6_F")
+mkpath("data/raw/C6_KG_IM")
 
 save_diagnostics(
     diagnostics,
-    "data/raw/C6_F/diagnostics.jld2",
+    "data/raw/C6_KG_IM/diagnostics.jld2",
 )
 
 println()

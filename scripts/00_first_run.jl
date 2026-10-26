@@ -1,12 +1,14 @@
 using ERT3D
 
-N = 32
+N =32
+T = Float32
 
-grid = Grid(N)
+grid = Grid(N; T=T)
 
 params = Parameters(
-    gamma = 1.4,
-    Mt0 = 0.1,
+    gamma = T(1.4),
+    Mt0 = T(0.1),
+    T = T,
 )
 
 derivative = Central4(grid)
@@ -44,8 +46,8 @@ hooks = [
     ),
 ]
 
-dt = 1e-3
-t_end = 0.01
+dt = 0.125/2
+t_end = dt * 55.0
 
 run!(
     sim,
@@ -54,8 +56,9 @@ run!(
     hooks = hooks,
     verbose = true,
 )
-
+#=
 save_diagnostics(
     diagnostics,
     "tgv_diagnostics.jld2",
 )
+=#

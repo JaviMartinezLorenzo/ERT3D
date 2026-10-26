@@ -46,7 +46,7 @@ include("schemes/Feiereisen.jl")
 include("integrators/abstract.jl")       # TimeIntegrator abstract type + step! interface
 include("integrators/explicit_rk3.jl")   # Shu-Osher TVD RK3 (matches Pirozzoli's paper)
 #include("integrators/explicit_rk4.jl")   # standard RK4 (asymmetric baseline)
-#include("integrators/implicit_midpoint.jl") # symmetric/time-reversible integrator
+include("integrators/implicit_midpoint.jl") # symmetric/time-reversible integrator
 
 # ---- Initial conditions -------------------------------------------------
 include("initial_conditions/abstract.jl")     # closed-form TGV velocity field
@@ -109,6 +109,7 @@ export initialize!
 # ---- Workspace --------------------------------------------
 
 export  RK3Workspace
+export  ImplicitMidpointWorkspace
 
 # ---- Simulation --------------------------------------------
 
@@ -125,6 +126,7 @@ export conserved_variables
 export rms_velocity
 export run_experiment
 export l2_reconstruction_error
+export state_errors
 
 export reverse_velocity!, copy_state!
 export axpy!
